@@ -18,6 +18,11 @@ function fmtDur(r){
 async function scan(){
   const res = await fetch('/api/scan');
   const data = await res.json();
+  if (!res.ok && data.error) {
+    alert(data.error);
+    tableBody.innerHTML = '';
+    return;
+  }
   renderRows(data.records || []);
 }
 

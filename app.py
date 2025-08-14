@@ -86,8 +86,13 @@ def api_settings():
 @app.route('/api/scan')
 def api_scan():
     repo_dir, _, _ = cfg_paths()
-    data = scan_repo(repo_dir)
-    return jsonify({'records': data})
+    if not os.path.isdir(repo_dir):
+        return jsonify({'error': f'Repo folder does not exist or is not a directory: {repo_dir}', 'records': []}), 400
+    try:
+        data = scan_repo(repo_dir)
+        return jsonify({'records': data})
+    except Exception as e:
+        return jsonify({'error': str(e), 'records': []}), 500
 
 
 @app.route('/api/move', methods=['POST'])
