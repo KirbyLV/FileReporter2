@@ -1,0 +1,237 @@
+/* ===== Dark Mode – drop-in replacement for static/app.css ===== */
+:root {
+  --bg: #0f1216;
+  --panel: #171b21;
+  --panel-2: #1e242c;
+  --text: #e9edf1;
+  --muted: #a9b3bf;
+  --link: #8ab4ff;
+  --ok: #2ecc71;
+  --warn: #f1c40f;
+  --err: #ff6b6b;
+  --accent: #3ea6ff;
+  --accent-2: #2d8dd8;
+  --border: #2a313a;
+  --shadow: rgba(0,0,0,0.5);
+  --focus: #7dd3fc;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h1,h2,h3 {
+  margin: 0 0 8px;
+  font-weight: 650;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Buttons */
+button, .btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: linear-gradient(0deg, #171b21, #1b2129);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform .06s ease, background .2s ease, border-color .2s ease;
+}
+
+button:hover, .btn:hover {
+  background: linear-gradient(0deg, #1c232c, #222a34);
+  border-color: var(--accent);
+}
+
+button:active, .btn:active {
+  transform: translateY(1px);
+}
+
+button.primary {
+  background: linear-gradient(0deg, var(--accent-2), var(--accent));
+  border-color: var(--accent);
+  color: #0b1117;
+}
+button.primary:hover {
+  filter: brightness(1.05);
+}
+
+/* Danger/Warning variants (optional utility classes) */
+button.warn { border-color: var(--warn); color: var(--text); }
+button.warn:hover { background: #2a2612; }
+button.danger { border-color: var(--err); color: var(--text); }
+button.danger:hover { background: #2a1517; }
+
+/* Inputs & selects */
+input[type="text"], input[type="number"], input[type="file"], select {
+  width: auto;
+  min-width: 160px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: #13171c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+label { color: var(--muted); }
+
+input:focus, select:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, .2);
+}
+
+/* Links */
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Table */
+.table-wrap {
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: #12161b;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 8px;
+  text-align: left;
+  font-size: 12px;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+tbody tr:nth-child(odd) { background: #151a20; }
+tbody tr:hover { background: #1a2028; }
+
+td {
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+
+/* Checkboxes (keeps native but improves visibility) */
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: #13171c;
+  color: var(--muted);
+}
+.badge.ok { color: #0fd18a; border-color: #0fd18a25; background: #0fd18a15; }
+.badge.warn { color: #f9d368; border-color: #f9d36825; background: #f9d36815; }
+.badge.err { color: #ff8a8a; border-color: #ff8a8a25; background: #ff8a8a12; }
+
+/* Job list / console output */
+pre, code, .log {
+  background: #0d1014;
+  color: #dbe7f3;
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 8px;
+  overflow: auto;
+}
+
+/* Forms grouping */
+.form-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 10px 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.form-actions { display: flex; gap: 8px; }
+
+/* Toasts / alerts (if you use them) */
+.toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px var(--shadow);
+}
+
+/* Focus visibility for accessibility */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, .35);
+}
+
+/* Scrollbar (WebKit) */
+::-webkit-scrollbar { height: 10px; width: 10px; }
+::-webkit-scrollbar-thumb { background: #2a323c; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #34404c; }
+::-webkit-scrollbar-track { background: #0e1216; }
+
+/* Small utility spacing */
+.mt-1{margin-top:4px}.mt-2{margin-top:8px}.mt-3{margin-top:12px}
+.mb-1{margin-bottom:4px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}

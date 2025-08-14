@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>File Reporter 2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header>
+    <h1>File Reporter 2</h1>
+    <button id="refresh">Scan Repo</button>
+    <button id="sync">Sync Google Sheet</button>
+    <a id="settingsLink" href="/settings">Settings</a>
+  </header>
+
+  <section class="toolbar">
+    <button id="checkAll">Check All</button>
+    <button id="uncheckAll">Uncheck All</button>
+    <label>Scale 1/
+      <select id="resFactor">
+        <option value="2">2</option>
+        <option value="4">4</option>
+      </select>
+    </label>
+    <label><input id="alphaEnable" type="checkbox"> Hap Alpha</label>
+    <button id="approve">Approve Assets</button>
+    <button id="quarantine">Quarantine Assets</button>
+    <button id="makeProxy">Make Proxies</button>
+    <button id="extractAudio">Extract Audio</button>
+  </section>
+
+  <section id="jobs"></section>
+
+  <section>
+    <table id="assets">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Name</th>
+          <th>FPS</th>
+          <th>Codec</th>
+          <th>Resolution</th>
+          <th>Duration</th>
+          <th>Has Audio</th>
+          <th>Path</th>
+          <th>Created</th>
+          <th>Modified</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
