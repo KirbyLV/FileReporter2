@@ -7,14 +7,22 @@ from pathlib import Path
 from pymediainfo import MediaInfo
 import ffmpeg
 
-VIDEO_EXTS = {'.mp4', '.mov', '.mxf', '.mkv', '.avi', '.m4v', '.webm', '.wmv'}
+VIDEO_EXTS = {'.mp4', '.mov', '.mxf', '.mkv', '.avi', '.m4v', '.webm', '.wmv', '.png'}
 AUDIO_EXTS = {'.wav', '.aiff', '.aif', '.mp3', '.m4a', '.flac', '.ogg'}
 MEDIA_EXTS = VIDEO_EXTS | AUDIO_EXTS
 
 VERSION_RE = re.compile(r"^(?P<stem>.*)_v(?P<ver>\d{1,3})$", re.IGNORECASE)
 
+IGNORED_BASENAMES = {'.DS_Store', 'Thumbs.db'}
+def is_hidden_path(path: str) -> bool:
+    b = os.path.basename(path)
+    # skip dotfiles (.foo) and AppleDouble (._foo)
+    return b.startswith('.') or b.startswith('._') or b in IGNORED_BASENAMES
+
 
 def is_media_file(path: str) -> bool:
+    if is_hidden_path(path):
+        return False
     return os.path.splitext(path)[1].lower() in MEDIA_EXTS
 
 
@@ -49,9 +57,28 @@ def ffprobe_streams(path: str) -> dict:
         return {}
 
 
-def analyze_media(path: str) -> dict:
-    info = {'path': os.path.abspath(path), 'name': os.path.basename(path), 'ext': os.path.splitext(path)[1].lower(), 'size_bytes': os.path.getsize(path)}
-    info.update(file_times(path))
+def analyze_media(path: str) -> dict | None:
+    # Skip hidden/sidecar files early
+    if is_hidden_path(path):
+        return None
+    try:
+        size = os.path.getsize(path)
+        abspath = os.path.abspath(path)
+    except OSError:
+        # unreadable or special file; skip
+        return None
+
+    info = {
+        'path': abspath,
+        'name': os.path.basename(path),
+        'ext': os.path.splitext(path)[1].lower(),
+        'size_bytes': size
+    }
+    try:
+        info.update(file_times(path))
+    except OSError:
+        # if stat fails, still include minimal info
+        info.update({'created_iso': None, 'modified_iso': None})
 
     codec = width = height = fps = duration_ms = None
     has_audio = False
@@ -107,8 +134,11 @@ def scan_repo(repo_dir: str):
     for root, _dirs, files in os.walk(repo_dir):
         for f in files:
             p = os.path.join(root, f)
-            if is_media_file(p):
-                records.append(analyze_media(p))
+            if not is_media_file(p):
+                continue
+            rec = analyze_media(p)
+            if rec is not None:
+                records.append(rec)
     return records
 
 
@@ -117,11 +147,21 @@ def move_files(paths, dest_dir, base_dir):
     os.makedirs(dest_dir, exist_ok=True)
     moved = []
     for p in paths:
+        if is_hidden_path(p):
+            # skip dotfiles / AppleDouble
+            continue
         abs_p = os.path.abspath(p)
         safe_relpath(abs_p, base_dir)
-        target = os.path.join(dest_dir, os.path.basename(abs_p))
-        shutil.move(abs_p, target)
-        moved.append(target)
+        try:
+            target = os.path.join(dest_dir, os.path.basename(abs_p))
+            shutil.move(abs_p, target)
+            moved.append(target)
+        except PermissionError:
+            # skip files like /repo/._something that are protected
+            continue
+        except FileNotFoundError:
+            # was deleted/moved meanwhile; skip
+            continue
     return moved
 
 

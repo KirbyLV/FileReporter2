@@ -27,8 +27,19 @@ JOBS = {}
 def load_settings():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     if os.path.exists(SETTINGS_PATH):
-        with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            # Backup the bad file and continue with defaults
+            try:
+                import time, shutil
+                ts = time.strftime('%Y%m%d-%H%M%S')
+                backup = f"{SETTINGS_PATH}.bad-{ts}"
+                shutil.copy2(SETTINGS_PATH, backup)
+            except Exception:
+                pass
+            # You could also log the error here
     return {
         'sheet_name': DEFAULT_SHEET_NAME,
         'service_account_json': DEFAULT_SA_JSON,
@@ -36,6 +47,7 @@ def load_settings():
         'quarantine_dir': ENV_QUARANTINE_DIR,
         'show_media_dir': ENV_SHOW_MEDIA_DIR,
     }
+
 
 
 def save_settings(data: dict):
@@ -85,14 +97,14 @@ def api_settings():
 
 @app.route('/api/scan')
 def api_scan():
-    repo_dir, _, _ = cfg_paths()
+    try:
+        repo_dir, _, _ = cfg_paths()
+    except Exception as e:
+        return jsonify({'error': f'Failed to load settings: {e}', 'records': []}), 500
     if not os.path.isdir(repo_dir):
         return jsonify({'error': f'Repo folder does not exist or is not a directory: {repo_dir}', 'records': []}), 400
-    try:
-        data = scan_repo(repo_dir)
-        return jsonify({'records': data})
-    except Exception as e:
-        return jsonify({'error': str(e), 'records': []}), 500
+    data = scan_repo(repo_dir)
+    return jsonify({'records': data})
 
 
 @app.route('/api/move', methods=['POST'])

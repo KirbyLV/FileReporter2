@@ -31,6 +31,17 @@ media-repo-manager/
 ├─ Dockerfile
 └─ docker-compose.yml
 
+## Project Setup, in docker
+Ensure Docker Desktop has access to the media and folder locations:
+-In Docker Desktop: Settings > Resources > File Sharing
+-Add folder directories as virtual file shares
+
+in docker-compose.yml:
+-under volumes, ensure the structure reads as:
+--/location/of/repo_folder:/repo:rw
+--/location/of/quarantine_folder:/repo_quarantine:rw
+--/location/of/show_media:/repo_show:rw
+
 ## Configuration (Env Vars)
 REPO_DIR – repo to scan (default /repo)
 
