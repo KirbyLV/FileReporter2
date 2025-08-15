@@ -8,15 +8,22 @@
 </head>
 <body>
   <header>
-    <h1>File Reporter 2</h1>
+    <img src="/static/assets/FR_Logo.png" alt="File Reporter Logo" id="logo" class="logo"/>
+    <h1 class="align-left">File Reporter 2</h1>
     <button id="refresh">Scan Repo</button>
-    <button id="sync">Sync Google Sheet</button>
+    <!-- <button id="sync">Sync Google Sheet</button> -->
     <a id="settingsLink" href="/settings">Settings</a>
   </header>
 
   <section class="toolbar">
+    <button id="sync">Sync Google Sheet</button>
+    <span class="toolbar-separator">|</span>
     <button id="checkAll">Check All</button>
     <button id="uncheckAll">Uncheck All</button>
+    <button id="approve">Approve Assets</button>
+    <button id="quarantine">Quarantine Assets</button>
+    <span class="toolbar-separator">|</span>
+    <label>Poxy Maker:</label>
     <label>Scale 1/
       <select id="resFactor">
         <option value="2">2</option>
@@ -24,9 +31,8 @@
       </select>
     </label>
     <label><input id="alphaEnable" type="checkbox"> Hap Alpha</label>
-    <button id="approve">Approve Assets</button>
-    <button id="quarantine">Quarantine Assets</button>
     <button id="makeProxy">Make Proxies</button>
+    <span class="toolbar-separator">|</span>
     <button id="extractAudio">Extract Audio</button>
   </section>
 
