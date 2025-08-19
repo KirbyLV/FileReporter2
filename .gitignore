@@ -3,3 +3,4 @@
 /__pycache__
 /config
 /personal_data
+docker-compose.yml
