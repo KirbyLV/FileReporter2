@@ -12,9 +12,15 @@ Proxies: Hap/Hap Alpha, scale factor 1/2 or 1/4, written to /repo/_proxies.
 
 Audio extract: MOV with Hap black 16×16 @30fps + PCM16LE 48k (maps video from a generated color source, audio from file).
 
-Google Sheets: Service Account auth; upsert by filename stem (portion before _vNN), update when a higher version appears.
-
 Docker: Dockerfile + docker-compose.yml with volumes and a writable /config for settings & service account JSON.
+
+### Google Sheets: 
+Service Account auth; upsert by filename stem (portion before _vNN), update when a higher version appears. 
+Your custom columns stay as-is. For existing rows we rewrite the whole row—but using the existing values we just read for custom columns, so they’re preserved.
+
+If you later add a new managed column (say, bitrate), the app adds that header to the right and starts filling it; your custom columns don’t move or get erased.
+
+The unique key is still stem (the filename base before _vNN). If you change stems manually in the sheet, the app will treat them as different assets.
 
 ## Project Structure
 media-repo-manager/
@@ -99,7 +105,9 @@ This JSON file will allow the app to authenticate and update your Google Sheet a
 
 
 
-## Running Locally (without Docker)
+## Running Locally (without Docker) - UNTESTED
+NOTE:: We have only tested anythgin with Docker and we recomend using docker desktop.
+
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -111,12 +119,12 @@ export GOOGLE_SERVICE_ACCOUNT_JSON="$CONFIG_DIR/google-service-account.json"
 export GOOGLE_SHEET_NAME="Media Repo Inventory"
 python app.py
 
-Open <http://localhost:8000>
+Open <http://localhost:8008>
 
 ## Notes
 Security: service account JSON is uploaded to /config via Settings page and never exposed back to the client.
 
-Version logic: keys on stem (before _vNN). We upsert the current state; add a history tab if you want per-version records retained.
+Version logic: keys on stem (before _vNN). We upsert the current state.
 
 Jobs: in-process thread pool for now; for larger batches consider Celery + Redis.
 

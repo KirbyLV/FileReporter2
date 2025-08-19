@@ -1,8 +1,8 @@
 import os
 import json
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, render_template, request, jsonify
-from dotenv import load_dotenv
+from flask import Flask, render_template, request, jsonify # type: ignore
+from dotenv import load_dotenv # type: ignore
 
 from media_utils import scan_repo, move_files, ffmpeg_proxy, ffmpeg_extract_audio
 from sheets_sync import open_sheet, sync_records
@@ -187,4 +187,4 @@ def api_sync_sheets():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8008, debug=True)
