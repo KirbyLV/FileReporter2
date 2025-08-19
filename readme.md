@@ -1,4 +1,5 @@
-# Media Repo Manager – Flask App (Docker-ready)
+# File Reporter 2
+A Docker-ready Flask App 
 
 A complete, ready-to-run Flask application to scan a media repository, view metadata, bulk move assets (approve/quarantine), generate Hap/Hap Alpha proxies to /repo/_proxies, extract audio to a Hap (black video) + PCM MOV, and sync records to Google Sheets with _vNN version tracking.
 
@@ -14,7 +15,7 @@ Audio extract: MOV with Hap black 16×16 @30fps + PCM16LE 48k (maps video from a
 
 Docker: Dockerfile + docker-compose.yml with volumes and a writable /config for settings & service account JSON.
 
-### Google Sheets: 
+#### Google Sheets: 
 Service Account auth; upsert by filename stem (portion before _vNN), update when a higher version appears. 
 Your custom columns stay as-is. For existing rows we rewrite the whole row—but using the existing values we just read for custom columns, so they’re preserved.
 
@@ -23,20 +24,24 @@ If you later add a new managed column (say, bitrate), the app adds that header t
 The unique key is still stem (the filename base before _vNN). If you change stems manually in the sheet, the app will treat them as different assets.
 
 ## Project Structure
+```
 media-repo-manager/
 ├─ app.py
 ├─ media_utils.py
 ├─ sheets_sync.py
+├─ configurator.py
 ├─ static/
 │  ├─ app.js
 │  └─ app.css
+|  └─ assets/
+│    └─ FR_Logo.png
 ├─ templates/
 │  ├─ index.html
 │  └─ settings.html
 ├─ requirements.txt
 ├─ Dockerfile
 └─ docker-compose.yml
-
+```
 ## Project Setup, in docker
 Ensure Docker Desktop has access to the media and folder locations:
 -In Docker Desktop: Settings > Resources > File Sharing
@@ -48,18 +53,74 @@ in docker-compose.yml:
 --/location/of/quarantine_folder:/repo_quarantine:rw
 --/location/of/show_media:/repo_show:rw
 
+## To Use
+### Initial Configuration:
+Launch `Configurator.py` and populate the values the app asks for
+<img width="917" height="452" alt="Screenshot 2025-08-19 at 9 12 56 AM" src="https://github.com/user-attachments/assets/456d480a-1381-4ef1-94de-228a9391e4fc" />
+
+Select the following by either typing in the paths or using the browse button:
++ Repo Folder: The location where all the raw content will arrive, while awaiting QC.
++ Show Folder: The location of the approved media, to be sync'd to show servers.
++ Quarantine Folder: A holding purgatory for items with issues or items that need to be reencoded. 
+
+Non mandatory:
++ Service Account JSON: The json file from google that enables google sheet synchronization. See below in "To obtain a Google service account JSON file for this application"
++ Google Sheet Name: The name of the sheet that the google API will publish to.  
+
+Once fields are popualted, the buttons to build the docker file and launch the app will become available.
+
+### Launching the app
+Ensure docker desktop is running and has access to the file locations needed.
+
+1. If google sheets is being used, click "Copy SA JSON to /config"
+2. Click on "Write docker-compose.yml"
+3. Click on "Start App". This will run `docker copose up-d` and will start the application. Yopu should see data process in the status frame.
+4. Click on "Open Web Portal" to launch the front end web portal in your browser. 
+
+Other controls:
++ View Log: shows the log in the status display, including any docker errors. This will continue to run until "Stop Log" is pressed.
++ Stop App: Shutsdown the docker containers, basically jsut runs `docker compose down `.
++ Restart App: restarts the docker containers. If repos are changed, you should stop and then start to grab the new docker compose file.
+
+All docker containers and their status should also be visible in docker desktop.
+
+### Using the app
+<img width="1121" height="236" alt="Screenshot 2025-08-19 at 9 26 12 AM" src="https://github.com/user-attachments/assets/50ebd126-82d7-4eb8-8d16-c86eb67f4497" />
+
+From the web portal, click on "Scan Repo" in the top to scan all files in the Repo Folder setup during configuration. 
+
+You can use the "Sync google Sheet"  button to publish the data visible in the web portal to the chosen google sheet setup during configuration. Please do this AFTER quarantining and BEFORE approving in order to keep an up-to-date record of which assets have been pushed to the show folder.
+
+#### File move actions
++ Aprove Assets: will move all selected assets (with a checkbox) from the repo folder to the show folder
++ Quarantine Assets: will move all selected assets from the repo folder to the quarantine folder
++ Niether of these will have any effect on your google sheet
+
+#### File processing
+Proxy Maker:
++ Select which files need proxies by selecting the appropriate checkboxes
++ Select the scale (1/4 or 1/2) of the desired proxy
++ Select whether or not the file has alpha (will encode with HAP or HAPALPHA)
++ Click on "Make Proxies"
+  You will see a line appear that shows the processing status of files. Proxied files will be loaded back into the repo folder ready for QC and will not be automatically pushed to the show folder.
+
+Audio Extraction:
++ Select which files need audio extraction by selecting the appropriate checkboxes
++ Click on "Extract Audio"
+  You will see a line appear that shows the processing status of files. Audio files will be encoded as 16x16 pixel black HAP files with the selected audio embedded. Files will be named as the original with an appeendage of `_hapaudio`. Audio files will be loaded back into the repo folder ready for QC and will not be automaticallty pushed to the show folder.
+
 ## Configuration (Env Vars)
-REPO_DIR – repo to scan (default /repo)
+- REPO_DIR – repo to scan (default /repo)
 
-QUARANTINE_DIR – destination for quarantined assets (default /repo_quarantine)
+- QUARANTINE_DIR – destination for quarantined assets (default /repo_quarantine)
 
-SHOW_MEDIA_DIR – destination for approved assets (default /repo_show)
+- SHOW_MEDIA_DIR – destination for approved assets (default /repo_show)
 
-CONFIG_DIR – writable config directory (default /config)
+- CONFIG_DIR – writable config directory (default /config)
 
-GOOGLE_SERVICE_ACCOUNT_JSON – service account JSON path (default /config/google-service-account.json)
+- GOOGLE_SERVICE_ACCOUNT_JSON – service account JSON path (default /config/google-service-account.json)
 
-GOOGLE_SHEET_NAME – default sheet name (editable in UI Settings)
+- GOOGLE_SHEET_NAME – default sheet name (editable in UI Settings)
 
 ## To obtain a Google service account JSON file for this application:
 
