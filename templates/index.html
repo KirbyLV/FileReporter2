@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>File Reporter 2</title>
   <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
 </head>
 <body>
   <header>
@@ -61,5 +62,11 @@
   </section>
 
   <script src="/static/app.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      new Tablesort(document.getElementById("assets"));
+    });
+  </script>
+
 </body>
 </html>

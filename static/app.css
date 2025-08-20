@@ -255,3 +255,31 @@ pre, code, .log {
   margin: 0 10px;
   vertical-align: middle;
 }
+
+/* Sortable header styles */
+table#assets thead th {
+  cursor: pointer !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  position: relative;
+  padding-right: 18px; /* space for arrow */
+  transition: background-color 0.15s ease;
+}
+
+table#assets thead th:hover {
+  background-color: #1a2028 !important; /* tweak color for dark theme if needed */
+}
+
+/* Arrow indicators placed via JS classes */
+table#assets thead th.asc::after,
+table#assets thead th.desc::after {
+  position: absolute;
+  right: 6px;
+  font-size: 0.8em;
+  line-height: 1;
+}
+
+table#assets thead th.asc::after { content: "▲"; }
+table#assets thead th.desc::after { content: "▼"; }

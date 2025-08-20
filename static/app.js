@@ -114,3 +114,76 @@ async function pollJob(el, id){
 }
 
 scan();
+
+
+(function attachSortableHeaders(){
+  function init() {
+    const table = document.getElementById('assets');
+    if (!table) return false;
+
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    if (!thead || !tbody) return false;
+
+    const headers = Array.from(thead.querySelectorAll('th'));
+    headers.forEach((th, colIdx) => {
+      // Skip the checkbox column (first col)
+      if (colIdx === 0) return;
+
+      // Avoid double-binding
+      if (th.dataset.sortBound === "1") return;
+      th.dataset.sortBound = "1";
+
+      th.addEventListener('click', () => {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const isAsc = th.classList.contains('asc');
+        const dir = isAsc ? -1 : 1;
+
+        // reset other headers' state
+        headers.forEach(h => { h.classList.remove('asc','desc'); });
+
+        // toggle this header’s state
+        th.classList.add(isAsc ? 'desc' : 'asc');
+
+        // pick extractors for numeric-ish columns
+        const getCell = (tr) => tr.children[colIdx]?.textContent?.trim() ?? "";
+
+        const sorted = rows.sort((a, b) => {
+          const A = getCell(a), B = getCell(b);
+
+          // numeric-aware compare
+          const aNum = Number(A.replace(/[^0-9.\-]/g, ''));
+          const bNum = Number(B.replace(/[^0-9.\-]/g, ''));
+          const bothNums = !Number.isNaN(aNum) && !Number.isNaN(bNum);
+
+          if (bothNums) return (aNum - bNum) * dir;
+
+          // ISO date friendly compare (your created/modified look ISO-ish)
+          const aDate = Date.parse(A), bDate = Date.parse(B);
+          const bothDates = !Number.isNaN(aDate) && !Number.isNaN(bDate);
+          if (bothDates) return (aDate - bDate) * dir;
+
+          // fallback to localeCompare (numeric option helps with 2 vs 10)
+          return A.localeCompare(B, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+        });
+
+        // reattach in sorted order
+        const frag = document.createDocumentFragment();
+        sorted.forEach(tr => frag.appendChild(tr));
+        tbody.innerHTML = '';
+        tbody.appendChild(frag);
+      });
+    });
+
+    return true;
+  }
+
+  // Run after initial load and also after your Scan re-renders rows
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // If your app re-renders headers dynamically in the future, call init() again.
+})();

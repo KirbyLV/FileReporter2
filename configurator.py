@@ -92,7 +92,7 @@ services:
       - "{repo_host}:/repo:rw"
       - "{show_host}:/repo_show:rw"
       - "{quarantine_host}:/repo_quarantine:rw"
-      - "{config_host}:/config:rw"
+      - "./config:/config:rw"
 """
 
 COMPOSE_BUILD = """
@@ -112,7 +112,7 @@ services:
       - "{repo_host}:/repo:rw"
       - "{show_host}:/repo_show:rw"
       - "{quarantine_host}:/repo_quarantine:rw"
-      - "{config_host}:/config:rw"
+      - "./config:/config:rw"
 """
 
 
