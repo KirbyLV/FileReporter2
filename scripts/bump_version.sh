@@ -20,3 +20,5 @@ echo "==> Pushing tag $VERSION to origin..."
 git push origin $VERSION
 
 echo "==> Done! Tag $VERSION created and pushed."
+
+# run the following in terminal and adjust the version number: ./scripts/bump_version.sh v1.0.1
