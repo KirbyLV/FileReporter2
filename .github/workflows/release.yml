@@ -4,6 +4,11 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write       # needed for GitHub Release
+  actions: read         # needed to download artifacts
+  packages: write       # if pushing to a registry like GHCR (safe to leave)
+
 jobs:
   docker:
     name: Build & Push Docker image
@@ -11,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      # Docker Hub login
+      # Docker Hub login (switch to GHCR if you prefer)
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -38,12 +43,14 @@ jobs:
       - run: pip install pyinstaller
       - name: Build Configurator
         run: |
-          pyinstaller --onefile --windowed --name "File Reporter 2" configurator.py
+          pyinstaller --onefile --windowed --name "Media Repo Configurator" configurator.py
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: configurator-${{ matrix.os }}
-          path: dist/*
+          path: dist/**
+          if-no-files-found: error   # fail early if dist is empty
+          retention-days: 7
 
   release:
     name: Create GitHub Release
@@ -51,10 +58,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Download all artifacts whose names start with "configurator-"
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: configurator-*
           path: artifacts
+          merge-multiple: true   # put all files directly into ./artifacts
+
+      - name: Show downloaded artifacts
+        run: ls -la artifacts || true
+
       - name: Prepare distribution compose
         run: |
           cat > docker-compose.yml <<'YML'
@@ -68,16 +83,14 @@ jobs:
                 GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
                 GOOGLE_SHEET_NAME: Media Repo Inventory
               volumes:
-                # macOS example: allow browsing under /Volumes
-                - /Volumes:/host/Volumes:ro
-                # writable config dir on host:
+                - /Volumes:/host/Volumes:ro   # macOS example
                 - ./config:/config:rw
           YML
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             docker-compose.yml
-            artifacts/configurator-macos-latest/*
-            artifacts/configurator-windows-latest/*
+            artifacts/*
           generate_release_notes: true
