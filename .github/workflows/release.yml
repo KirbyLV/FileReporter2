@@ -43,7 +43,7 @@ jobs:
       - run: pip install pyinstaller
       - name: Build Configurator
         run: |
-          pyinstaller --onefile --windowed --name "Media Repo Configurator" configurator.py
+          pyinstaller --onefile --windowed --name "FileReporter2 Configurator" configurator.py
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

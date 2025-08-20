@@ -5,10 +5,57 @@ import webbrowser
 import threading
 import time
 
+# --- Quiet subprocess helpers (add under imports) ---
+def _win_si():
+    if os.name != "nt":
+        return None, 0
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    flags = subprocess.CREATE_NO_WINDOW
+    return si, flags
+
+def run_quiet(cmd, cwd=None):
+    si, flags = _win_si()
+    return subprocess.run(
+        cmd, cwd=cwd,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        text=True,
+        startupinfo=si, creationflags=flags
+    ).returncode
+
+def run_capture(cmd, cwd=None):
+    si, flags = _win_si()
+    p = subprocess.run(
+        cmd, cwd=cwd,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True,
+        startupinfo=si, creationflags=flags
+    )
+    return p.returncode, p.stdout
+
+def run_stream_quiet(cmd, cwd=None, on_line=None):
+    si, flags = _win_si()
+    p = subprocess.Popen(
+        cmd, cwd=cwd,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
+        startupinfo=si, creationflags=flags
+    )
+    def pump():
+        for line in p.stdout:
+            if on_line: on_line(line.rstrip("\n"))
+        p.wait()
+        if on_line: on_line(f"[process exited {p.returncode}]")
+    t = threading.Thread(target=pump, daemon=True)
+    t.start()
+    return p
+# --- end helpers ---
+
+
 APP_SERVICE_NAME = "media"  # the service name in docker-compose
 DEFAULT_SHEET_NAME = "Media Repo Inventory"
 
-COMPOSE_TEMPLATE = """version: "3.9"
+COMPOSE_TEMPLATE = """
 services:
   media:
     build: .
@@ -27,6 +74,47 @@ services:
       - "{quarantine_host}:/repo_quarantine:rw"
       - "./config:/config:rw"
 """
+
+COMPOSE_IMAGE = """
+services:
+  media:
+    image: {image_ref}
+    ports:
+      - "8008:8008"
+    environment:
+      REPO_DIR: /repo
+      SHOW_MEDIA_DIR: /repo_show
+      QUARANTINE_DIR: /repo_quarantine
+      CONFIG_DIR: /config
+      GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
+      GOOGLE_SHEET_NAME: {sheet_name}
+    volumes:
+      - "{repo_host}:/repo:rw"
+      - "{show_host}:/repo_show:rw"
+      - "{quarantine_host}:/repo_quarantine:rw"
+      - "{config_host}:/config:rw"
+"""
+
+COMPOSE_BUILD = """
+services:
+  media:
+    build: .
+    ports:
+      - "8008:8008"
+    environment:
+      REPO_DIR: /repo
+      SHOW_MEDIA_DIR: /repo_show
+      QUARANTINE_DIR: /repo_quarantine
+      CONFIG_DIR: /config
+      GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
+      GOOGLE_SHEET_NAME: {sheet_name}
+    volumes:
+      - "{repo_host}:/repo:rw"
+      - "{show_host}:/repo_show:rw"
+      - "{quarantine_host}:/repo_quarantine:rw"
+      - "{config_host}:/config:rw"
+"""
+
 
 def which(cmd):
     from shutil import which as w
@@ -82,6 +170,8 @@ class Configurator(tk.Tk):
         self.config.trace_add("write", self.update_buttons)
         self.sheet.trace_add("write", self.update_buttons)
 
+        self.deploy_mode = tk.StringVar(value="image")  # "image" or "build"
+        self.image_ref = tk.StringVar(value="jspodick/filereporter2:latest")  # <-- set to your Docker Hub image
 
         # UI
         pad = {'padx': 10, 'pady': 6}
@@ -104,6 +194,21 @@ class Configurator(tk.Tk):
         f2 = tk.Frame(self); f2.pack(fill="x", **pad)
         tk.Label(f2, text="Google Sheet Name:", width=18, anchor="w").pack(side="left")
         tk.Entry(f2, textvariable=self.sheet).pack(side="left", fill="x", expand=True, padx=8)
+
+        # Deployment mode
+        modef = tk.Frame(self); modef.pack(fill="x", padx=10, pady=6)
+        tk.Label(modef, text="Deployment Mode:", width=18, anchor="w").pack(side="left")
+
+        modestrip = tk.Frame(modef); modestrip.pack(side="left", fill="x", expand=True)
+        tk.Radiobutton(modestrip, text="Use prebuilt image", variable=self.deploy_mode, value="image",
+                       command=self.update_buttons).pack(side="left")
+        tk.Radiobutton(modestrip, text="Build locally", variable=self.deploy_mode, value="build",
+                       command=self.update_buttons).pack(side="left")
+
+        # Image ref (only used when mode=image)
+        imgf = tk.Frame(self); imgf.pack(fill="x", padx=10, pady=6)
+        tk.Label(imgf, text="Image (repo:tag):", width=18, anchor="w").pack(side="left")
+        tk.Entry(imgf, textvariable=self.image_ref).pack(side="left", fill="x", expand=True, padx=8)
 
         # Buttons
         bf = tk.Frame(self); bf.pack(fill="x", pady=12, padx=10)
@@ -208,7 +313,10 @@ class Configurator(tk.Tk):
 
     def write_compose(self):
         if not self.validate(): return
-        compose_text = COMPOSE_TEMPLATE.format(
+        mode = self.deploy_mode.get()
+        template = COMPOSE_IMAGE if mode == "image" else COMPOSE_BUILD
+        compose_text = template.format(
+            image_ref=self.image_ref.get(),
             repo_host=self.repo.get(),
             show_host=self.show.get(),
             quarantine_host=self.quarantine.get(),
@@ -217,7 +325,7 @@ class Configurator(tk.Tk):
         )
         with open("docker-compose.yml", "w", encoding="utf-8") as f:
             f.write(compose_text)
-        self.log("✅ Wrote docker-compose.yml")
+        self.log("✅ Wrote docker-compose.yml (" + ("image" if mode=="image" else "build") + ")")
         self.log(compose_text)
 
     def copy_sa_json(self):
@@ -242,12 +350,11 @@ class Configurator(tk.Tk):
         return list(base) + list(args)
 
     def refresh_status(self):
-        cmd = self.docker_cmd("ps")
+        cmd = self.docker_cmd("ps", "-q")
         if not cmd: return
-        code, out = run(cmd, cwd=os.getcwd())
-        running = ("Up" in out) or ("running" in out.lower())
+        code, out = run_capture(cmd, cwd=os.getcwd())
+        running = bool(out.strip())
         self.status_var.set("Status: RUNNING" if running else "Status: STOPPED")
-        # Auto-enable Open button only when running
         self.btn_open.configure(state=("normal" if running else "disabled"))
 
     def status_poll(self):
@@ -260,43 +367,64 @@ class Configurator(tk.Tk):
     def compose_up(self):
         if not os.path.isfile("docker-compose.yml"):
             self.write_compose()
-        cmd = self.docker_cmd("up", "-d", "--build")
-        if not cmd: return
-        self.log("Running: " + " ".join(shlex.quote(x) for x in cmd))
-        code, out = run(cmd, cwd=os.getcwd())
+        cmd_base = self.docker_cmd()
+        if not cmd_base:
+            messagebox.showerror("Docker not found", "Need Docker Desktop / docker compose.")
+            return
+
+        # Pull if using prebuilt image
+        if self.deploy_mode.get() == "image":
+            pull_cmd = cmd_base + ["pull"]
+            self.log("Running: " + " ".join(shlex.quote(x) for x in pull_cmd))
+            run_quiet(pull_cmd, cwd=os.getcwd())
+
+        up_cmd = cmd_base + ["up", "-d"]
+        if self.deploy_mode.get() == "build":
+            up_cmd += ["--build"]
+
+        self.log("Running: " + " ".join(shlex.quote(x) for x in up_cmd))
+        code = run_quiet(up_cmd, cwd=os.getcwd())
+
         if code == 0:
             self.log("🚀 App started. Open http://localhost:8008")
         else:
             self.log("❌ docker compose up failed.")
+
         self.refresh_status()
 
     def compose_down(self):
         cmd = self.docker_cmd("down")
         if not cmd: return
         self.log("Running: " + " ".join(shlex.quote(x) for x in cmd))
-        code, out = run(cmd, cwd=os.getcwd())
-        self.log(out)
+        code = run_quiet(cmd, cwd=os.getcwd())
+        if code == 0:
+            self.log("🛑 App stopped.")
+        else:
+            self.log("❌ docker compose down failed.")
         self.refresh_status()
 
     def compose_restart(self):
         cmd = self.docker_cmd("restart")
         if not cmd: return
         self.log("Running: " + " ".join(shlex.quote(x) for x in cmd))
-        code, out = run(cmd, cwd=os.getcwd())
-        self.log(out)
+        code = run_quiet(cmd, cwd=os.getcwd())
+        if code == 0:
+            self.log("🔁 App restarted.")
+        else:
+            self.log("❌ docker compose restart failed.")
         self.refresh_status()
 
     def follow_logs(self):
         if self.log_proc:
             self.log("Logs already following.")
             return
-        cmd = self.docker_cmd("logs", "-f", "--tail", "100")
+        cmd = self.docker_cmd("logs", "-f", "--tail", "200")
         if not cmd: return
         self.log("Following logs… (click 'Stop Logs' to end)")
         self.btn_logs.configure(state="disabled")
         self.btn_stoplogs.configure(state="normal")
         def on_line(line): self.log(line)
-        self.log_proc = run_stream(cmd, cwd=os.getcwd(), on_line=on_line)
+        self.log_proc = run_stream_quiet(cmd, cwd=os.getcwd(), on_line=on_line)
 
     def stop_logs(self):
         if not self.log_proc: return
