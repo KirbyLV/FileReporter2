@@ -16,10 +16,19 @@ function fmtDur(r){
 }
 
 async function scan(){
-  const res = await fetch('/api/scan');
-  const data = await res.json();
-  if (!res.ok && data.error) {
-    alert(data.error);
+  let res, text, data;
+  try {
+    res = await fetch('/api/scan');
+    text = await res.text();
+    data = JSON.parse(text);
+  } catch (e) {
+    alert('Scan failed.'); 
+    console.error(e, text);
+    tableBody.innerHTML = '';
+    return;
+  }
+  if (!res.ok) {
+    alert((data && data.error) || 'Scan error.');
     tableBody.innerHTML = '';
     return;
   }
@@ -51,8 +60,16 @@ function selectedPaths(){
 }
 
 async function postJSON(url, body){
-  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  return await res.json();
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
 }
 
 $('#refresh').addEventListener('click', scan);
@@ -62,10 +79,15 @@ $('#uncheckAll').addEventListener('click', ()=> $$('.sel').forEach(el=> el.check
 $('#approve').addEventListener('click', async ()=>{
   const paths = selectedPaths();
   if (!paths.length) return alert('No files selected');
-  const out = await postJSON('/api/move', {action:'approve', paths});
-  alert(out.error || `Moved ${out.moved.length} files`);
-  await scan();
+  try {
+    const out = await postJSON('/api/move', {action:'approve', paths});
+    alert(out.error || `Moved ${out.moved?.length || 0} files`);
+    await scan();
+  } catch (e) {
+    alert(e.message || 'Approve failed');
+  }
 });
+
 
 $('#quarantine').addEventListener('click', async ()=>{
   const paths = selectedPaths();
