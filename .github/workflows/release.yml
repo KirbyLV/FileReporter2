@@ -1,0 +1,83 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  docker:
+    name: Build & Push Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Docker Hub login
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            jspodick/filereporter2:${{ github.ref_name }}
+            jspodick/filereporter2:latest
+
+  configurator:
+    name: Build Configurator (macOS & Windows)
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyinstaller
+      - name: Build Configurator
+        run: |
+          pyinstaller --onefile --windowed --name "File Reporter 2" configurator.py
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: configurator-${{ matrix.os }}
+          path: dist/*
+
+  release:
+    name: Create GitHub Release
+    needs: [docker, configurator]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Prepare distribution compose
+        run: |
+          cat > docker-compose.yml <<'YML'
+          services:
+            media:
+              image: jspodick/filereporter2:${{ github.ref_name }}
+              ports:
+                - "8008:8008"
+              environment:
+                CONFIG_DIR: /config
+                GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
+                GOOGLE_SHEET_NAME: Media Repo Inventory
+              volumes:
+                # macOS example: allow browsing under /Volumes
+                - /Volumes:/host/Volumes:ro
+                # writable config dir on host:
+                - ./config:/config:rw
+          YML
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            docker-compose.yml
+            artifacts/configurator-macos-latest/*
+            artifacts/configurator-windows-latest/*
+          generate_release_notes: true
