@@ -1,3 +1,4 @@
+
 services:
   media:
     build: .
@@ -11,7 +12,7 @@ services:
       GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
       GOOGLE_SHEET_NAME: FileReporter2-Test
     volumes:
-      - "/Volumes/media2/2H25/ContentDownload:/repo:rw"
-      - "/Volumes/media2/2H25/show_media:/repo_show:rw"
-      - "/Volumes/media2/2H25/quar:/repo_quarantine:rw"
+      - "D:/ContentDownload/Content_Repo:/repo:rw"
+      - "D:/ContentDownload/ShowFolder:/repo_show:rw"
+      - "D:/ContentDownload/Quarantine:/repo_quarantine:rw"
       - "./config:/config:rw"

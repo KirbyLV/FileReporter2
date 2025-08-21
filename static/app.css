@@ -283,3 +283,15 @@ table#assets thead th.desc::after {
 
 table#assets thead th.asc::after { content: "▲"; }
 table#assets thead th.desc::after { content: "▼"; }
+
+#jobs .job {
+  margin: 8px 0; padding: 10px 12px;
+  background: #0f172a; color: #e5e7eb; border-radius: 8px;
+  font-size: 0.95rem;
+}
+#jobs .job-head { display: flex; align-items: center; gap: 8px; }
+#jobs .job-progress { margin-top: 6px; height: 6px; background: #1f2937; border-radius: 999px; overflow: hidden; }
+#jobs .job-progress .bar { height: 100%; width: 0%; background: #22c55e; transition: width .25s ease; }
+#jobs details.job-errors-wrap { margin-top: 8px; }
+#jobs .job-errors { margin: 6px 0 0 0; padding-left: 18px; }
+#jobs .job-errors li { color: #fca5a5; word-break: break-all; }

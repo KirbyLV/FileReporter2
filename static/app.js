@@ -76,26 +76,24 @@ $('#refresh').addEventListener('click', scan);
 $('#checkAll').addEventListener('click', ()=> $$('.sel').forEach(el=> el.checked = true));
 $('#uncheckAll').addEventListener('click', ()=> $$('.sel').forEach(el=> el.checked = false));
 
+function clearSelections(){ $$('.sel:checked').forEach(cb => cb.checked = false); }
+
 $('#approve').addEventListener('click', async ()=>{
   const paths = selectedPaths();
   if (!paths.length) return alert('No files selected');
-  try {
-    const out = await postJSON('/api/move', {action:'approve', paths});
-    alert(out.error || `Moved ${out.moved?.length || 0} files`);
-    await scan();
-  } catch (e) {
-    alert(e.message || 'Approve failed');
-  }
+  const res = await postJSON('/api/move-async', {action:'approve', paths});
+  addMoveJob(res.job_id, paths.length, 'Approving');
+  clearSelections(); // optional
 });
-
 
 $('#quarantine').addEventListener('click', async ()=>{
   const paths = selectedPaths();
   if (!paths.length) return alert('No files selected');
-  const out = await postJSON('/api/move', {action:'quarantine', paths});
-  alert(out.error || `Moved ${out.moved.length} files`);
-  await scan();
+  const res = await postJSON('/api/move-async', {action:'quarantine', paths});
+  addMoveJob(res.job_id, paths.length, 'Quarantining');
+  clearSelections(); // optional
 });
+
 
 $('#makeProxy').addEventListener('click', async ()=>{
   const paths = selectedPaths();
@@ -125,6 +123,72 @@ function addJob(id){
   $('#jobs').appendChild(div);
   pollJob(div, id);
 }
+
+function addMoveJob(jobId, total, label){
+  const div = document.createElement('div');
+  div.dataset.jobId = jobId;
+  div.className = 'job';
+  div.dataset.errCount = "0";
+  div.innerHTML = `
+    <div class="job-head"><strong>${label}</strong>: <span class="job-count">0/${total}</span></div>
+    <div class="job-progress"><div class="bar" style="width:0%"></div></div>
+    <details class="job-errors-wrap" hidden>
+      <summary>Errors (<span class="job-error-count">0</span>)</summary>
+      <ul class="job-errors"></ul>
+    </details>
+  `;
+  $('#jobs').appendChild(div);
+  pollMoveJob(div, jobId, total, label);
+}
+
+function pollMoveJob(el, id, total, label){
+  const countEl = el.querySelector('.job-count');
+  const barEl   = el.querySelector('.bar');
+  const errsWrap= el.querySelector('.job-errors-wrap');
+  const errsCountEl = el.querySelector('.job-error-count');
+  const errsList= el.querySelector('.job-errors');
+
+  const t = setInterval(async ()=>{
+    const res = await fetch(`/api/jobs/${id}`);
+    const data = await res.json();
+
+    if (!data || !data.status) return;
+
+    const moved = data.moved ?? 0;
+    const errs  = Array.isArray(data.errors) ? data.errors : [];
+
+    // progress + count
+    countEl.textContent = `${moved}/${total}`;
+    const pct = total > 0 ? Math.round((moved/total)*100) : 0;
+    barEl.style.width = `${pct}%`;
+
+    // errors
+    const prevErrCount = parseInt(el.dataset.errCount || "0", 10);
+    if (errs.length !== prevErrCount) {
+      // update list only when changed
+      errsList.innerHTML = '';
+      errs.forEach(msg => {
+        const li = document.createElement('li');
+        li.textContent = msg;
+        errsList.appendChild(li);
+      });
+      errsCountEl.textContent = String(errs.length);
+      el.dataset.errCount = String(errs.length);
+      errsWrap.hidden = errs.length === 0;
+    }
+
+    // terminal states
+    if (data.status === 'done' || data.status === 'done_with_errors') {
+      clearInterval(t);
+      // final fill (in case the last step was fast)
+      barEl.style.width = '100%';
+      // refresh table after completion
+      await scan();
+    }
+  }, 1200);
+}
+
+
 
 async function pollJob(el, id){
   const t = setInterval(async ()=>{
@@ -209,3 +273,4 @@ scan();
 
   // If your app re-renders headers dynamically in the future, call init() again.
 })();
+

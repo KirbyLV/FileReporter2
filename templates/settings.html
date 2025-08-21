@@ -5,71 +5,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Settings – File Reporter 2</title>
   <link rel="stylesheet" href="/static/app.css" />
+   <style>
+    .form { max-width: 760px; margin: 24px auto; }
+    .row { display:grid; grid-template-columns: 220px 1fr; gap:12px 16px; margin:10px 0; align-items:center; }
+    .actions { margin-top:12px; display:flex; gap:8px; align-items:center; }
+    .msg { font-weight:600; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Settings</h1>
-    <a href="/">← Back</a>
+ <header>
+    <div>
+      <img src="/static/assets/FR_Logo.png" alt="File Reporter Logo" class="logo"/>
+      <h1>Settings</h1>
+    </div>
+    <a href="/">Back</a>
   </header>
 
-  <section>
-    <h2>Google Sheets</h2>
-    <form id="settingsForm">
-      <div class="row">
-        <label>Sheet Name
-          <input type="text" id="sheetName" required />
-        </label>
-      </div>
-      <div class="row">
-        <label>Service Account JSON
-          <input type="file" id="saJson" accept="application/json" />
-        </label>
-      </div>
-
-      <!-- <h2>Paths</h2>
-      <div class="row">
-        <label>Repo Folder
-          <input type="text" id="repoDir" placeholder="/repo" />
-        </label>
-      </div>
-      <div class="row">
-        <label>Show Media Folder
-          <input type="text" id="showMediaDir" placeholder="/repo_show" />
-        </label>
-      </div>
-      <div class="row">
-        <label>Quarantine Folder
-          <input type="text" id="quarantineDir" placeholder="/repo_quarantine" />
-        </label>
-      </div> -->
-
-      <button type="submit">Save Settings</button>
-    </form>
-  </section>
+  <main class="form">
+    <div class="row"><label>Repo Folder</label><input id="repo_dir" placeholder="/repo" /></div>
+    <div class="row"><label>Show Media Folder</label><input id="show_media_dir" placeholder="/repo_show" /></div>
+    <div class="row"><label>Quarantine Folder</label><input id="quarantine_dir" placeholder="/repo_quarantine" /></div>
+    <div class="row"><label>Google Sheet Name</label><input id="sheet_name" placeholder="Media Repo Inventory" /></div>
+    <div class="row"><label>Service Account JSON Path</label><input id="service_account_json" placeholder="/config/google-service-account.json" /></div>
+    <div class="actions">
+      <button id="save">Save Settings</button>
+      <span id="msg" class="msg"></span>
+    </div>
+  </main>
 
   <script>
-    async function loadSettings(){
-      const res = await fetch('/api/settings');
-      const cfg = await res.json();
-      document.getElementById('sheetName').value = cfg.sheet_name || '';
-      document.getElementById('repoDir').value = cfg.repo_dir || '';
-      document.getElementById('showMediaDir').value = cfg.show_media_dir || '';
-      document.getElementById('quarantineDir').value = cfg.quarantine_dir || '';
+    async function load() {
+      const r = await fetch('/api/settings'); const d = await r.json();
+      for (const k of ['repo_dir','show_media_dir','quarantine_dir','sheet_name','service_account_json']) {
+        const el = document.getElementById(k); if (el && d[k] != null) el.value = d[k];
+      }
     }
-    document.getElementById('settingsForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const fd = new FormData();
-      fd.append('sheet_name', document.getElementById('sheetName').value);
-      fd.append('repo_dir', document.getElementById('repoDir').value);
-      fd.append('show_media_dir', document.getElementById('showMediaDir').value);
-      fd.append('quarantine_dir', document.getElementById('quarantineDir').value);
-      const file = document.getElementById('saJson').files[0];
-      if (file) fd.append('sa_json', file, 'google-service-account.json');
-      const res = await fetch('/api/settings', { method:'POST', body: fd });
-      const out = await res.json();
-      alert(out.error || 'Saved!');
-    });
-    loadSettings();
+    async function save() {
+      const body = {
+        repo_dir: document.getElementById('repo_dir').value.trim(),
+        show_media_dir: document.getElementById('show_media_dir').value.trim(),
+        quarantine_dir: document.getElementById('quarantine_dir').value.trim(),
+        sheet_name: document.getElementById('sheet_name').value.trim(),
+        service_account_json: document.getElementById('service_account_json').value.trim(),
+      };
+      const res = await fetch('/api/settings', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(()=>({}));
+      const msg = document.getElementById('msg');
+      if (!res.ok) { msg.textContent = data.error || 'Save failed'; msg.style.color='tomato'; return; }
+      msg.textContent = 'Saved!'; msg.style.color='limegreen';
+    }
+    document.getElementById('save').addEventListener('click', save);
+    load();
   </script>
 </body>
 </html>

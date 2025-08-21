@@ -1,5 +1,5 @@
 import os
-import json
+import json, tempfile, shutil
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, jsonify # type: ignore
 from dotenv import load_dotenv # type: ignore
@@ -70,8 +70,49 @@ def index():
 def settings_page():
     return render_template('settings.html')
 
-
 @app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    if request.method == 'GET':
+        return jsonify(load_settings())
+
+    cfg = load_settings()
+    content_type = request.headers.get('Content-Type', '')
+    payload = {}
+
+    try:
+        if content_type.startswith('application/json'):
+            payload = request.get_json(force=True, silent=False) or {}
+        else:
+            for key in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json']:
+                if key in request.form and request.form[key].strip():
+                    payload[key] = request.form[key].strip()
+            if 'sa_json' in request.files and request.files['sa_json']:
+                f = request.files['sa_json']
+                os.makedirs(CONFIG_DIR, exist_ok=True)
+                path = os.path.join(CONFIG_DIR, 'google-service-account.json')
+                f.save(path)
+                payload['service_account_json'] = path
+    except Exception as e:
+        return jsonify({'error': f'Invalid settings payload: {e}'}), 400
+
+    for key in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json']:
+        if payload.get(key):
+            cfg[key] = payload[key]
+
+    missing = [k for k in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json'] if not cfg.get(k)]
+    if missing:
+        return jsonify({'error': f"Missing fields: {', '.join(missing)}"}), 400
+
+    # atomic write
+    fd, tmp = tempfile.mkstemp(dir=CONFIG_DIR, prefix='settings.', suffix='.json')
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, indent=2)
+    shutil.move(tmp, SETTINGS_PATH)
+
+    return jsonify({'status': 'ok', 'settings': cfg})
+
+
+""" @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
     if request.method == 'GET':
         return jsonify(load_settings())
@@ -92,7 +133,7 @@ def api_settings():
         cfg['service_account_json'] = path
 
     save_settings(cfg)
-    return jsonify({'status': 'ok', 'settings': cfg})
+    return jsonify({'status': 'ok', 'settings': cfg}) """
 
 
 @app.route('/api/scan')
@@ -172,18 +213,85 @@ def api_extract_audio():
 def api_job(job_id):
     return jsonify(JOBS.get(job_id, {'status': 'unknown'}))
 
-
 @app.route('/api/sync-sheets', methods=['POST'])
 def api_sync_sheets():
-    repo_dir, _, _ = cfg_paths()
-    records = scan_repo(repo_dir)
     try:
+        repo_dir, _, _ = cfg_paths()
         cfg = load_settings()
-        ws = open_sheet(cfg['service_account_json'], cfg['sheet_name'])
+        sa = cfg.get('service_account_json')
+        sheet = cfg.get('sheet_name')
+
+        if not sheet:
+            return jsonify({'error': 'Missing sheet_name in settings.'}), 400
+        if not sa or not os.path.isfile(sa):
+            return jsonify({'error': f'Service account JSON not found at {sa}'}), 400
+
+        records = scan_repo(repo_dir)
+
+        # Try open by ID/URL or by name (see open_sheet patch below)
+        ws = open_sheet(sa, sheet)
+
         sync_records(ws, records)
         return jsonify({'status': 'ok', 'count': len(records)})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@app.route('/api/move-async', methods=['POST'])
+def api_move_async():
+    repo_dir, quarantine_dir, show_media_dir = cfg_paths()
+    payload = request.get_json(force=True) or {}
+    paths = payload.get('paths') or []
+    action = payload.get('action')  # 'quarantine' or 'approve'
+
+    if not paths:
+        return jsonify({'error': 'No paths provided'}), 400
+    if action not in ('quarantine', 'approve'):
+        return jsonify({'error': 'Invalid action'}), 400
+
+    dest = quarantine_dir if action == 'quarantine' else show_media_dir
+
+    job_id = f"move:{len(JOBS)+1}"
+    JOBS[job_id] = {
+        'status': 'queued',
+        'moved': 0,
+        'total': len(paths),
+        'errors': [],
+        'action': action,
+        'dest': dest,
+    }
+
+    def run():
+        moved_count = 0
+        errors = []
+        from media_utils import move_files as _move_files
+        for p in paths:
+            try:
+                _move_files([p], dest, repo_dir)  # validates in-repo, handles duplicates, etc.
+                moved_count += 1
+            except Exception as e:
+                errors.append(f"{p}: {e}")
+            # update progress as we go
+            JOBS[job_id] = {
+                'status': 'running',
+                'moved': moved_count,
+                'total': len(paths),
+                'errors': errors,
+                'action': action,
+                'dest': dest,
+            }
+        final_status = 'done_with_errors' if errors else 'done'
+        JOBS[job_id] = {
+            'status': final_status,
+            'moved': moved_count,
+            'total': len(paths),
+            'errors': errors,
+            'action': action,
+            'dest': dest,
+        }
+
+    executor.submit(run)
+    # 202 is a nice semantic for “accepted; processing”
+    return jsonify({'job_id': job_id}), 202
 
 
 if __name__ == '__main__':
