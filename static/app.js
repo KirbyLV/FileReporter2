@@ -151,21 +151,31 @@ function pollMoveJob(el, id, total, label){
   const t = setInterval(async ()=>{
     const res = await fetch(`/api/jobs/${id}`);
     const data = await res.json();
-
     if (!data || !data.status) return;
 
     const moved = data.moved ?? 0;
     const errs  = Array.isArray(data.errors) ? data.errors : [];
-
-    // progress + count
     countEl.textContent = `${moved}/${total}`;
-    const pct = total > 0 ? Math.round((moved/total)*100) : 0;
+
+    // Prefer byte-based progress if available
+    let pct = 0;
+    if ((data.total_bytes ?? 0) > 0) {
+      const bytes = data.bytes ?? 0;
+      pct = Math.max(0, Math.min(100, Math.round((bytes / data.total_bytes) * 100)));
+      // Boost a bit with current file pct so bar doesn't "stall" long
+      if (pct < 100 && typeof data.current_pct === 'number') {
+        // blend in up to 0.5 of current file pct
+        pct = Math.min(99, pct + Math.round(data.current_pct * 0.5));
+      }
+    } else {
+      // fallback to file-count progress
+      pct = total > 0 ? Math.round((moved/total)*100) : 0;
+    }
     barEl.style.width = `${pct}%`;
 
-    // errors
+    // errors list
     const prevErrCount = parseInt(el.dataset.errCount || "0", 10);
     if (errs.length !== prevErrCount) {
-      // update list only when changed
       errsList.innerHTML = '';
       errs.forEach(msg => {
         const li = document.createElement('li');
@@ -177,15 +187,12 @@ function pollMoveJob(el, id, total, label){
       errsWrap.hidden = errs.length === 0;
     }
 
-    // terminal states
     if (data.status === 'done' || data.status === 'done_with_errors') {
       clearInterval(t);
-      // final fill (in case the last step was fast)
       barEl.style.width = '100%';
-      // refresh table after completion
       await scan();
     }
-  }, 1200);
+  }, 1000);
 }
 
 
