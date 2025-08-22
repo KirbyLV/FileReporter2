@@ -112,30 +112,6 @@ def api_settings():
     return jsonify({'status': 'ok', 'settings': cfg})
 
 
-""" @app.route('/api/settings', methods=['GET', 'POST'])
-def api_settings():
-    if request.method == 'GET':
-        return jsonify(load_settings())
-
-    # Accept multipart form for file upload and text fields
-    cfg = load_settings()
-
-    # Text fields
-    for key in ['sheet_name', 'repo_dir', 'quarantine_dir', 'show_media_dir']:
-        if key in request.form and request.form[key].strip():
-            cfg[key] = request.form[key].strip()
-
-    # Upload of service account JSON
-    if 'sa_json' in request.files and request.files['sa_json']:
-        f = request.files['sa_json']
-        path = os.path.join(CONFIG_DIR, 'google-service-account.json')
-        f.save(path)
-        cfg['service_account_json'] = path
-
-    save_settings(cfg)
-    return jsonify({'status': 'ok', 'settings': cfg}) """
-
-
 @app.route('/api/scan')
 def api_scan():
     try:
@@ -241,7 +217,7 @@ def api_move_async():
     repo_dir, quarantine_dir, show_media_dir = cfg_paths()
     payload = request.get_json(force=True) or {}
     paths = payload.get('paths') or []
-    action = payload.get('action')  # 'quarantine' or 'approve'
+    action = payload.get('action')
 
     if not paths:
         return jsonify({'error': 'No paths provided'}), 400
@@ -250,47 +226,93 @@ def api_move_async():
 
     dest = quarantine_dir if action == 'quarantine' else show_media_dir
 
+    # compute total bytes (missing files count as 0)
+    def fsize(p):
+        try: return os.path.getsize(p)
+        except Exception: return 0
+    total_bytes = sum(fsize(p) for p in paths)
+
     job_id = f"move:{len(JOBS)+1}"
     JOBS[job_id] = {
         'status': 'queued',
-        'moved': 0,
-        'total': len(paths),
+        'moved': 0,              # files moved
+        'total': len(paths),     # total files
+        'bytes': 0,              # bytes moved so far
+        'total_bytes': total_bytes,
         'errors': [],
         'action': action,
         'dest': dest,
+        'current': None,         # currently moving file
+        'current_pct': 0
     }
 
     def run():
         moved_count = 0
+        bytes_moved = 0
         errors = []
-        from media_utils import move_files as _move_files
+        from media_utils import move_one_fast
+
         for p in paths:
+            # progress callback for a single file
+            def on_progress(bytes_so_far, pct):
+                # bytes_so_far is per-file; convert to global-ish gauge:
+                # We can't know previously moved bytes for this file, so we only
+                # use pct for UI, and set 'current_pct'
+                JOBS[job_id].update({
+                    'status': 'running',
+                    'current': p,
+                    'current_pct': pct,
+                    'moved': moved_count,
+                    'bytes': bytes_moved
+                })
+
             try:
-                _move_files([p], dest, repo_dir)  # validates in-repo, handles duplicates, etc.
+                # update current file start
+                JOBS[job_id].update({
+                    'status': 'running',
+                    'current': p,
+                    'current_pct': 0,
+                    'moved': moved_count,
+                    'bytes': bytes_moved
+                })
+
+                # record size before move for global bytes tally
+                size_before = fsize(p)
+                move_one_fast(p, dest, on_progress=on_progress)
+
                 moved_count += 1
+                bytes_moved += size_before
+
+                JOBS[job_id].update({
+                    'status': 'running',
+                    'current': None,
+                    'current_pct': 100,
+                    'moved': moved_count,
+                    'bytes': bytes_moved
+                })
+
             except Exception as e:
                 errors.append(f"{p}: {e}")
-            # update progress as we go
-            JOBS[job_id] = {
-                'status': 'running',
-                'moved': moved_count,
-                'total': len(paths),
-                'errors': errors,
-                'action': action,
-                'dest': dest,
-            }
+                JOBS[job_id].update({
+                    'status': 'running',
+                    'current': None,
+                    'current_pct': 0,
+                    'moved': moved_count,
+                    'bytes': bytes_moved,
+                    'errors': errors
+                })
+
         final_status = 'done_with_errors' if errors else 'done'
-        JOBS[job_id] = {
+        JOBS[job_id].update({
             'status': final_status,
             'moved': moved_count,
-            'total': len(paths),
+            'bytes': bytes_moved,
             'errors': errors,
-            'action': action,
-            'dest': dest,
-        }
+            'current': None,
+            'current_pct': 0
+        })
 
     executor.submit(run)
-    # 202 is a nice semantic for “accepted; processing”
     return jsonify({'job_id': job_id}), 202
 
 
