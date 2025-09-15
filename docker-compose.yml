@@ -10,9 +10,9 @@ services:
       QUARANTINE_DIR: /repo_quarantine
       CONFIG_DIR: /config
       GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
-      GOOGLE_SHEET_NAME: FileReporter2-Test
+      GOOGLE_SHEET_NAME: Media Repo Inventory
     volumes:
-      - "D:/ContentDownload/Content_Repo:/repo:rw"
-      - "D:/ContentDownload/ShowFolder:/repo_show:rw"
-      - "D:/ContentDownload/Quarantine:/repo_quarantine:rw"
+      - "/Users/jspodick/Documents/Video/TestFolder:/repo:rw"
+      - "/Users/jspodick/Documents/Video/test_show:/repo_show:rw"
+      - "/Users/jspodick/Documents/Video/test_quarantine:/repo_quarantine:rw"
       - "./config:/config:rw"

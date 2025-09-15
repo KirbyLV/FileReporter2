@@ -46,6 +46,7 @@ def load_settings():
         'repo_dir': ENV_REPO_DIR,
         'quarantine_dir': ENV_QUARANTINE_DIR,
         'show_media_dir': ENV_SHOW_MEDIA_DIR,
+        'use_robocopy': False
     }
 
 
@@ -68,7 +69,8 @@ def index():
 
 @app.route('/settings')
 def settings_page():
-    return render_template('settings.html')
+    cfg = load_settings()
+    return render_template('settings.html', settings=cfg)
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
@@ -80,30 +82,44 @@ def api_settings():
     payload = {}
 
     try:
+        # Handle JSON body
         if content_type.startswith('application/json'):
             payload = request.get_json(force=True, silent=False) or {}
+
+        # Handle multipart form (HTML form upload)
         else:
-            for key in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json']:
+            for key in ['sheet_name', 'repo_dir', 'quarantine_dir', 'show_media_dir', 'service_account_json']:
                 if key in request.form and request.form[key].strip():
                     payload[key] = request.form[key].strip()
+
+            # Robocopy checkbox → will only appear if checked
+            if 'use_robocopy' in request.form:
+                payload['use_robocopy'] = True
+            else:
+                payload['use_robocopy'] = False
+
+            # Service account JSON file upload
             if 'sa_json' in request.files and request.files['sa_json']:
                 f = request.files['sa_json']
                 os.makedirs(CONFIG_DIR, exist_ok=True)
                 path = os.path.join(CONFIG_DIR, 'google-service-account.json')
                 f.save(path)
                 payload['service_account_json'] = path
+
     except Exception as e:
         return jsonify({'error': f'Invalid settings payload: {e}'}), 400
 
-    for key in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json']:
-        if payload.get(key):
+    # Merge into cfg
+    for key in ['sheet_name', 'repo_dir', 'quarantine_dir', 'show_media_dir', 'service_account_json', 'use_robocopy']:
+        if key in payload:
             cfg[key] = payload[key]
 
+    # Validate required fields
     missing = [k for k in ['sheet_name','repo_dir','quarantine_dir','show_media_dir','service_account_json'] if not cfg.get(k)]
     if missing:
         return jsonify({'error': f"Missing fields: {', '.join(missing)}"}), 400
 
-    # atomic write
+    # Write atomically
     fd, tmp = tempfile.mkstemp(dir=CONFIG_DIR, prefix='settings.', suffix='.json')
     with os.fdopen(fd, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, indent=2)
@@ -127,16 +143,30 @@ def api_scan():
 @app.route('/api/move', methods=['POST'])
 def api_move():
     repo_dir, quarantine_dir, show_media_dir = cfg_paths()
+    cfg = load_settings()
+    use_robocopy = cfg.get('use_robocopy', False)
+
     payload = request.get_json(force=True)
     paths = payload.get('paths', [])
     action = payload.get('action')  # 'quarantine' or 'approve'
     dest = quarantine_dir if action == 'quarantine' else show_media_dir
-    try:
-        moved = move_files(paths, dest, repo_dir)
-        return jsonify({'moved': moved})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
 
+    moved = []
+    errors = []
+
+    for p in paths:
+        try:
+            if use_robocopy and os.name == 'nt':
+                newp = move_with_robocopy(p, dest)
+            else:
+                newp = move_files([p], dest, repo_dir)[0]
+            moved.append(newp)
+        except Exception as e:
+            errors.append(f"{p}: {e}")
+
+    if errors:
+        return jsonify({'error': errors, 'moved': moved}), 400
+    return jsonify({'moved': moved})
 
 @app.route('/api/proxy', methods=['POST'])
 def api_proxy():
@@ -215,6 +245,9 @@ def api_sync_sheets():
 @app.route('/api/move-async', methods=['POST'])
 def api_move_async():
     repo_dir, quarantine_dir, show_media_dir = cfg_paths()
+    cfg = load_settings()
+    use_robocopy = cfg.get('use_robocopy', False)
+
     payload = request.get_json(force=True) or {}
     paths = payload.get('paths') or []
     action = payload.get('action')

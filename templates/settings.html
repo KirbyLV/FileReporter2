@@ -27,6 +27,11 @@
     <div class="row"><label>Quarantine Folder</label><input id="quarantine_dir" placeholder="/repo_quarantine" /></div> -->
     <div class="row"><label>Google Sheet Name</label><input id="sheet_name" placeholder="Media Repo Inventory" /></div>
     <div class="row"><label>Service Account JSON Path</label><input id="service_account_json" placeholder="/config/google-service-account.json" /></div>
+    <label>
+      <input type="checkbox" id="use_robocopy" name="use_robocopy" value="true"
+       {% if settings.use_robocopy %}checked{% endif %}>
+      Use Robocopy for file operations (Windows only)
+    </label>
     <div class="actions">
       <button id="save">Save Settings</button>
       <span id="msg" class="msg"></span>
@@ -35,29 +40,47 @@
 
   <script>
     async function load() {
-      const r = await fetch('/api/settings'); const d = await r.json();
-      for (const k of ['repo_dir','show_media_dir','quarantine_dir','sheet_name','service_account_json']) {
-        const el = document.getElementById(k); if (el && d[k] != null) el.value = d[k];
+      const r = await fetch('/api/settings');
+      const d = await r.json();
+    
+      // Only populate existing inputs
+      for (const k of ['sheet_name','service_account_json']) {
+        const el = document.getElementById(k);
+        if (el && d[k] != null) el.value = d[k];
       }
+    
+      // Handle Robocopy checkbox
+      const chk = document.getElementById('use_robocopy');
+      if (chk && d.use_robocopy) chk.checked = true;
     }
+  
     async function save() {
       const body = {
-        repo_dir: document.getElementById('repo_dir').value.trim(),
-        show_media_dir: document.getElementById('show_media_dir').value.trim(),
-        quarantine_dir: document.getElementById('quarantine_dir').value.trim(),
         sheet_name: document.getElementById('sheet_name').value.trim(),
         service_account_json: document.getElementById('service_account_json').value.trim(),
+        use_robocopy: document.getElementById('use_robocopy').checked
       };
+    
       const res = await fetch('/api/settings', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
       });
+    
       const data = await res.json().catch(()=>({}));
       const msg = document.getElementById('msg');
-      if (!res.ok) { msg.textContent = data.error || 'Save failed'; msg.style.color='tomato'; return; }
-      msg.textContent = 'Saved!'; msg.style.color='limegreen';
+      if (!res.ok) {
+        msg.textContent = data.error || 'Save failed';
+        msg.style.color = 'tomato';
+        return;
+      }
+      msg.textContent = 'Saved!';
+      msg.style.color = 'limegreen';
     }
+  
     document.getElementById('save').addEventListener('click', save);
     load();
   </script>
+
 </body>
 </html>
