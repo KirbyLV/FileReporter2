@@ -1,13 +1,12 @@
 import os
 import re
 import json
-import subprocess
+import subprocess, shutil, platform, shlex
 from datetime import datetime
 from pathlib import Path
 from pymediainfo import MediaInfo
 import ffmpeg
 import errno
-import shlex
 
 VIDEO_EXTS = {'.mp4', '.mov', '.mxf', '.mkv', '.avi', '.m4v', '.webm', '.wmv', '.png'}
 AUDIO_EXTS = {'.wav', '.aiff', '.aif', '.mp3', '.m4a', '.flac', '.ogg'}
@@ -280,28 +279,20 @@ def move_files(paths, dest_dir, repo_dir=None, on_file_progress=None):
     return moved
 
 
-def move_with_robocopy(src: str, dst_dir: str):
-    """
-    Move a file using Robocopy (Windows only).
-    Returns the new destination path.
-    """
+def move_with_robocopy(src: str, dst_dir: str) -> str:
+    """Use Robocopy on Windows to move a file (works across volumes)."""
+    if platform.system() != "Windows":
+        raise RuntimeError("Robocopy only available on Windows")
+
     os.makedirs(dst_dir, exist_ok=True)
-    dst = os.path.join(dst_dir, os.path.basename(src))
+    dst_file = os.path.join(dst_dir, os.path.basename(src))
 
-    # Robocopy syntax: robocopy <source_dir> <dest_dir> <filename> /MOV /NFL /NDL /NJH /NJS /nc /ns /np
-    src_dir = os.path.dirname(src)
-    filename = os.path.basename(src)
-
-    cmd = [
-        "robocopy", src_dir, dst_dir, filename,
-        "/MOV", "/NFL", "/NDL", "/NJH", "/NJS", "/nc", "/ns", "/np"
-    ]
-
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode >= 8:  # Robocopy returns codes <8 on success
-        raise RuntimeError(f"Robocopy failed: {proc.stdout}\n{proc.stderr}")
-
-    return dst
+    # Robocopy expects dirs, not files → copy then delete
+    cmd = ["robocopy", os.path.dirname(src), dst_dir, os.path.basename(src), "/MOV", "/NFL", "/NDL", "/NJH", "/NJS", "/nc", "/ns", "/np"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode >= 8:  # robocopy returns 0–7 as success
+        raise RuntimeError(f"Robocopy failed: {result.stderr or result.stdout}")
+    return dst_file
 
 
 def _within(base, path):

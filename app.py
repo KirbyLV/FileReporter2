@@ -3,6 +3,7 @@ import json, tempfile, shutil
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, jsonify # type: ignore
 from dotenv import load_dotenv # type: ignore
+import platform
 
 from media_utils import scan_repo, move_files, ffmpeg_proxy, ffmpeg_extract_audio
 from sheets_sync import open_sheet, sync_records
@@ -283,7 +284,7 @@ def api_move_async():
         moved_count = 0
         bytes_moved = 0
         errors = []
-        from media_utils import move_one_fast
+        from media_utils import move_one_fast, move_with_robocopy
 
         for p in paths:
             # progress callback for a single file
@@ -311,7 +312,10 @@ def api_move_async():
 
                 # record size before move for global bytes tally
                 size_before = fsize(p)
-                move_one_fast(p, dest, on_progress=on_progress)
+                if use_robocopy and platform.system() == 'Windows':
+                    newp = move_with_robocopy(p, dest)
+                else:
+                    newp = move_one_fast(p, dest, on_progress=on_progress)
 
                 moved_count += 1
                 bytes_moved += size_before
