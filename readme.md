@@ -13,7 +13,7 @@ If desired, you can clone the entire git repo and run from configurator using "b
 
 ### Initial Configuration:
 Launch `Configurator.py` and populate the values the app asks for
-<img width="913" height="625" alt="Screenshot 2025-08-22 at 1 00 44 PM" src="https://github.com/user-attachments/assets/a0e14a9b-bf23-45cc-9740-c402f289f9ad" />
+<img width="913" height="625" alt="Screenshot-FileReporter2-Configurator" src="https://github.com/user-attachments/assets/a0e14a9b-bf23-45cc-9740-c402f289f9ad" />
 
 Select the following by either typing in the paths or using the browse button:
 + Repo Folder: The location where all the raw content will arrive, while awaiting QC.
@@ -55,13 +55,15 @@ services:
 ```
 
 ### Using the app
-<img width="1121" height="236" alt="Screenshot 2025-08-19 at 9 26 12 AM" src="https://github.com/user-attachments/assets/50ebd126-82d7-4eb8-8d16-c86eb67f4497" />
+<img width="1121" height="236" alt="Screenshot-FileReporter2-UI" src="https://github.com/user-attachments/assets/50ebd126-82d7-4eb8-8d16-c86eb67f4497" />
 
 From the web portal, click on "Scan Repo" in the top to scan all files in the Repo Folder setup during configuration. 
 
 You can use the "Sync google Sheet"  button to publish the data visible in the web portal to the chosen google sheet setup during configuration. Please do this AFTER quarantining and BEFORE approving in order to keep an up-to-date record of which assets have been pushed to the show folder.
 
 #### Settings
+<img width="848" height="325" alt="Screenshot-FileReporter2-Settings" src="https://github.com/user-attachments/assets/35a9fa58-8347-40ce-a60b-29d66d7853e9" />
+
 + There is a link for the settigns page in the top-right corner of the web portal.
 + Aside from checking the google sheet name and path that you loaded for the Google Service Account JSON file, you can decide to use Robocopy for file move actions.
 + By default, the app has built-in functions to move files between Docker mounts, that translate to the folders you assigned during setup.
