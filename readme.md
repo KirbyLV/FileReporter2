@@ -33,7 +33,7 @@ Ensure docker desktop is running and has access to the file locations needed.
 
 1. If google sheets is being used, click "Copy SA JSON to /config"
 2. Click on "Write docker-compose.yml"
-3. Click on "Start App". This will run `docker copose up-d` and will start the application. Yopu should see data process in the status frame.
+3. Click on "Start App". This will run `docker compose up-d` and will start the application. Yopu should see data process in the status frame.
 4. Click on "Open Web Portal" to launch the front end web portal in your browser. 
 
 Other controls:
