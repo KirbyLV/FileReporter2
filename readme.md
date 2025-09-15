@@ -61,6 +61,12 @@ From the web portal, click on "Scan Repo" in the top to scan all files in the Re
 
 You can use the "Sync google Sheet"  button to publish the data visible in the web portal to the chosen google sheet setup during configuration. Please do this AFTER quarantining and BEFORE approving in order to keep an up-to-date record of which assets have been pushed to the show folder.
 
+#### Settings
++ There is a link for the settigns page in the top-right corner of the web portal.
++ Aside from checking the google sheet name and path that you loaded for the Google Service Account JSON file, you can decide to use Robocopy for file move actions.
++ By default, the app has built-in functions to move files between Docker mounts, that translate to the folders you assigned during setup.
++ On Windows, Robocopy may be slightly faster for file moves, but you do not see the move progress. It is user-preference on which method to use.
+
 #### File move actions
 + Aprove Assets: will move all selected assets (with a checkbox) from the repo folder to the show folder
 + Quarantine Assets: will move all selected assets from the repo folder to the quarantine folder
