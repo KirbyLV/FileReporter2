@@ -42,7 +42,7 @@ def to_row_dict(rec: dict) -> dict:
     pv = parse_version(rec['name'])
     return {
         'stem': pv['stem'],
-        'version': pv['version'],
+        'version': pv['version'], #keep as int if possible
         'filename': rec.get('name'),
         'ext': rec.get('ext'),
         'path': rec.get('path'),
@@ -116,7 +116,14 @@ def sync_records(ws, records: list):
         # Merge managed fields into row_vec at their column positions
         for key, val in managed.items():
             if key in header_to_idx:
-                row_vec[header_to_idx[key]] = "" if val is None else str(val)
+                if val is None:
+                    row_vec[header_to_idx[key]] = ""
+                else:
+                    if key == 'version' and isinstance(val, (int, float)):
+                        row_vec[header_to_idx[key]] = val
+                    else:
+                        row_vec[header_to_idx[key]] = str(val)
+                # row_vec[header_to_idx[key]] = "" if val is None else str(val)
 
         if rnum:
             # Update the whole row range with the merged vector (preserves custom columns' current values)
