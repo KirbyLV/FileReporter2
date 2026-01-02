@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, jsonify # type: ignore
 from dotenv import load_dotenv # type: ignore
 import platform
 
-from media_utils import scan_repo, move_files, ffmpeg_proxy, ffmpeg_extract_audio
+from media_utils import scan_repo, move_files, ffmpeg_proxy, ffmpeg_extract_audio, move_with_robocopy
 from sheets_sync import open_sheet, sync_records
 
 load_dotenv()
@@ -158,9 +158,9 @@ def api_move():
     for p in paths:
         try:
             if use_robocopy and os.name == 'nt':
-                newp = move_with_robocopy(p, dest)
+                newp = move_with_robocopy(p, dest, repo_dir=repo_dir)
             else:
-                newp = move_files([p], dest, repo_dir)[0]
+                newp = move_files([p], dest, repo_dir=repo_dir)[0]
             moved.append(newp)
         except Exception as e:
             errors.append(f"{p}: {e}")
@@ -313,9 +313,9 @@ def api_move_async():
                 # record size before move for global bytes tally
                 size_before = fsize(p)
                 if use_robocopy and platform.system() == 'Windows':
-                    newp = move_with_robocopy(p, dest)
+                    newp = move_with_robocopy(p, dest, repo_dir=repo_dir)
                 else:
-                    newp = move_one_fast(p, dest, on_progress=on_progress)
+                    newp = move_one_fast(p, dest, on_progress=on_progress, repo_dir=repo_dir)
 
                 moved_count += 1
                 bytes_moved += size_before

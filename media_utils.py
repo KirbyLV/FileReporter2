@@ -157,19 +157,32 @@ def _same_device(path_a: str, path_b: str) -> bool:
 def _ensure_dir(p: str):
     os.makedirs(p, exist_ok=True)
 
-def _unique_dest(dst_dir: str, basename: str) -> str:
+def _unique_dest(dst_dir: str, basename: str, subdir: str = "") -> str:
+    """
+    Generate a unique destination path, optionally preserving subdirectory structure.
+
+    Args:
+        dst_dir: Base destination directory
+        basename: Filename
+        subdir: Optional subdirectory path to preserve (relative to dst_dir)
+    """
+    # Create full destination directory including subdirectory structure
+    full_dst_dir = os.path.join(dst_dir, subdir) if subdir else dst_dir
+    _ensure_dir(full_dst_dir)
+
     root, ext = os.path.splitext(basename)
-    candidate = os.path.join(dst_dir, basename)
+    candidate = os.path.join(full_dst_dir, basename)
     i = 1
     while os.path.exists(candidate):
-        candidate = os.path.join(dst_dir, f"{root} ({i}){ext}")
+        candidate = os.path.join(full_dst_dir, f"{root} ({i}){ext}")
         i += 1
     return candidate
 
 
-def _rename_fast(src: str, dst_dir: str) -> str:
-    _ensure_dir(dst_dir)
-    dst = _unique_dest(dst_dir, os.path.basename(src))
+def _rename_fast(src: str, dst_dir: str, subdir: str = "") -> str:
+    full_dst_dir = os.path.join(dst_dir, subdir) if subdir else dst_dir
+    _ensure_dir(full_dst_dir)
+    dst = _unique_dest(dst_dir, os.path.basename(src), subdir)
     os.replace(src, dst)
     return dst
 
@@ -177,14 +190,15 @@ def _have(cmd: str) -> bool:
     from shutil import which
     return which(cmd) is not None
 
-def _rsync_move(src: str, dst_dir: str, on_progress=None) -> str:
+def _rsync_move(src: str, dst_dir: str, on_progress=None, subdir: str = "") -> str:
     """Use rsync for cross-device copy; remove source after."""
-    _ensure_dir(dst_dir)
+    full_dst_dir = os.path.join(dst_dir, subdir) if subdir else dst_dir
+    _ensure_dir(full_dst_dir)
     # rsync prints overall progress to stderr with --info=progress2
     # We stream and parse percent/bytes to feed UI if on_progress is set.
     cmd = [
         "rsync", "-a", "--info=progress2", "--no-inc-recursive",
-        "--remove-source-files", "--", src, dst_dir + os.sep
+        "--remove-source-files", "--", src, full_dst_dir + os.sep
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
 
@@ -216,25 +230,49 @@ def _rsync_move(src: str, dst_dir: str, on_progress=None) -> str:
         try: os.remove(src)
         except Exception: pass
 
-    return os.path.join(dst_dir, os.path.basename(src))
+    return os.path.join(full_dst_dir, os.path.basename(src))
 
-def _mv_move(src: str, dst_dir: str):
-    _ensure_dir(dst_dir)
-    cmd = ["mv", "--", src, dst_dir + os.sep]
+def _mv_move(src: str, dst_dir: str, subdir: str = ""):
+    full_dst_dir = os.path.join(dst_dir, subdir) if subdir else dst_dir
+    _ensure_dir(full_dst_dir)
+    cmd = ["mv", "--", src, full_dst_dir + os.sep]
     subprocess.run(cmd, check=True)
-    return os.path.join(dst_dir, os.path.basename(src))
+    return os.path.join(full_dst_dir, os.path.basename(src))
 
-def move_one_fast(src: str, dst_dir: str, on_progress=None) -> str:
+def move_one_fast(src: str, dst_dir: str, on_progress=None, repo_dir: str = None) -> str:
     """
     Move a single file to dst_dir:
       1) try atomic rename (fastest)
       2) on EXDEV, fall back to rsync (with progress) or mv
+
+    Args:
+        src: Source file path
+        dst_dir: Base destination directory
+        on_progress: Optional progress callback
+        repo_dir: Optional repo base directory to preserve folder structure
     """
+    # Calculate subdirectory structure to preserve
+    subdir = ""
+    if repo_dir:
+        try:
+            # Get the relative path from repo_dir to the file's parent directory
+            src_abs = os.path.abspath(src)
+            repo_abs = os.path.abspath(repo_dir)
+            src_parent = os.path.dirname(src_abs)
+            if src_parent.startswith(repo_abs + os.sep):
+                subdir = os.path.relpath(src_parent, repo_abs)
+                # Handle case where file is directly in repo_dir (relpath returns '.')
+                if subdir == '.':
+                    subdir = ""
+        except (ValueError, Exception):
+            # If there's any issue calculating the relative path, just use empty subdir
+            subdir = ""
+
     _ensure_dir(dst_dir)
 
     # 1) Try atomic rename regardless of st_dev (Docker Desktop can misreport)
     try:
-        return _rename_fast(src, dst_dir)
+        return _rename_fast(src, dst_dir, subdir)
     except OSError as e:
         # Only fall back if it's a cross-device link error
         if getattr(e, "errno", None) != errno.EXDEV:
@@ -244,13 +282,14 @@ def move_one_fast(src: str, dst_dir: str, on_progress=None) -> str:
 
     # 2) Cross-device fallback
     if _have("rsync"):
-        return _rsync_move(src, dst_dir, on_progress=on_progress)
-    return _mv_move(src, dst_dir)
+        return _rsync_move(src, dst_dir, on_progress=on_progress, subdir=subdir)
+    return _mv_move(src, dst_dir, subdir)
 
 
 def move_files(paths, dest_dir, repo_dir=None, on_file_progress=None):
     """
     Move many files with fast path + robust EXDEV fallback.
+    Preserves folder structure from repo_dir if provided.
     on_file_progress(file_path, bytes_so_far, pct) if provided.
     Returns list of new paths.
     """
@@ -260,35 +299,69 @@ def move_files(paths, dest_dir, repo_dir=None, on_file_progress=None):
         if repo_dir and not os.path.abspath(p).startswith(os.path.abspath(repo_dir) + os.sep):
             raise ValueError(f"path outside repo: {p}")
 
+        # Calculate subdirectory structure to preserve
+        subdir = ""
+        if repo_dir:
+            try:
+                src_abs = os.path.abspath(p)
+                repo_abs = os.path.abspath(repo_dir)
+                src_parent = os.path.dirname(src_abs)
+                if src_parent.startswith(repo_abs + os.sep):
+                    subdir = os.path.relpath(src_parent, repo_abs)
+                    if subdir == '.':
+                        subdir = ""
+            except (ValueError, Exception):
+                subdir = ""
+
         # First try the fast path
         try:
             newp = move_one_fast(
                 p, dest_dir,
-                on_progress=(lambda b, pct, fp=p: on_file_progress and on_file_progress(fp, b, pct))
+                on_progress=(lambda b, pct, fp=p: on_file_progress and on_file_progress(fp, b, pct)),
+                repo_dir=repo_dir
             )
         except OSError as e:
             # Final safety: explicit EXDEV fallback here as well
             if getattr(e, "errno", None) == errno.EXDEV or (isinstance(e.args, tuple) and len(e.args) > 0 and e.args[0] == errno.EXDEV):
                 if _have("rsync"):
-                    newp = _rsync_move(p, dest_dir, on_progress=(lambda b, pct, fp=p: on_file_progress and on_file_progress(fp, b, pct)))
+                    newp = _rsync_move(p, dest_dir, on_progress=(lambda b, pct, fp=p: on_file_progress and on_file_progress(fp, b, pct)), subdir=subdir)
                 else:
-                    newp = _mv_move(p, dest_dir)
+                    newp = _mv_move(p, dest_dir, subdir)
             else:
                 raise
         moved.append(newp)
     return moved
 
 
-def move_with_robocopy(src: str, dst_dir: str) -> str:
-    """Use Robocopy on Windows to move a file (works across volumes)."""
+def move_with_robocopy(src: str, dst_dir: str, repo_dir: str = None) -> str:
+    """
+    Use Robocopy on Windows to move a file (works across volumes).
+    Preserves folder structure from repo_dir if provided.
+    """
     if platform.system() != "Windows":
         raise RuntimeError("Robocopy only available on Windows")
 
-    os.makedirs(dst_dir, exist_ok=True)
-    dst_file = os.path.join(dst_dir, os.path.basename(src))
+    # Calculate subdirectory structure to preserve
+    subdir = ""
+    if repo_dir:
+        try:
+            src_abs = os.path.abspath(src)
+            repo_abs = os.path.abspath(repo_dir)
+            src_parent = os.path.dirname(src_abs)
+            if src_parent.startswith(repo_abs + os.sep):
+                subdir = os.path.relpath(src_parent, repo_abs)
+                if subdir == '.':
+                    subdir = ""
+        except (ValueError, Exception):
+            subdir = ""
+
+    # Create full destination directory including subdirectory structure
+    full_dst_dir = os.path.join(dst_dir, subdir) if subdir else dst_dir
+    os.makedirs(full_dst_dir, exist_ok=True)
+    dst_file = os.path.join(full_dst_dir, os.path.basename(src))
 
     # Robocopy expects dirs, not files → copy then delete
-    cmd = ["robocopy", os.path.dirname(src), dst_dir, os.path.basename(src), "/MOV", "/NFL", "/NDL", "/NJH", "/NJS", "/nc", "/ns", "/np"]
+    cmd = ["robocopy", os.path.dirname(src), full_dst_dir, os.path.basename(src), "/MOV", "/NFL", "/NDL", "/NJH", "/NJS", "/nc", "/ns", "/np"]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode >= 8:  # robocopy returns 0–7 as success
         raise RuntimeError(f"Robocopy failed: {result.stderr or result.stdout}")
