@@ -6,7 +6,7 @@ from dotenv import load_dotenv # type: ignore
 import platform
 
 from media_utils import scan_repo, move_files, ffmpeg_proxy, ffmpeg_extract_audio, move_with_robocopy
-from sheets_sync import open_sheet, sync_records
+from sheets_sync import open_sheet, sync_records, log_upload
 
 load_dotenv()
 
@@ -143,9 +143,16 @@ def api_scan():
 
 @app.route('/api/move', methods=['POST'])
 def api_move():
+    from datetime import datetime
+
     repo_dir, quarantine_dir, show_media_dir = cfg_paths()
     cfg = load_settings()
     use_robocopy = cfg.get('use_robocopy', False)
+
+    # Get Google Sheets config for logging
+    sa_json = cfg.get('service_account_json')
+    sheet_name = cfg.get('sheet_name')
+    log_to_sheets = bool(sa_json and sheet_name and os.path.isfile(sa_json))
 
     payload = request.get_json(force=True)
     paths = payload.get('paths', [])
@@ -162,6 +169,16 @@ def api_move():
             else:
                 newp = move_files([p], dest, repo_dir=repo_dir)[0]
             moved.append(newp)
+
+            # Log to upload_log worksheet
+            if log_to_sheets:
+                try:
+                    timestamp = datetime.utcnow().isoformat() + 'Z'
+                    log_upload(sa_json, sheet_name, newp, timestamp)
+                except Exception as e:
+                    # Don't fail the move if logging fails
+                    print(f"Warning: Failed to log to sheets: {e}")
+
         except Exception as e:
             errors.append(f"{p}: {e}")
 
@@ -285,6 +302,16 @@ def api_move_async():
         bytes_moved = 0
         errors = []
         from media_utils import move_one_fast, move_with_robocopy
+        from datetime import datetime
+
+        # Get Google Sheets config for logging
+        try:
+            sheets_cfg = load_settings()
+            sa_json = sheets_cfg.get('service_account_json')
+            sheet_name = sheets_cfg.get('sheet_name')
+            log_to_sheets = bool(sa_json and sheet_name and os.path.isfile(sa_json))
+        except Exception:
+            log_to_sheets = False
 
         for p in paths:
             # progress callback for a single file
@@ -316,6 +343,15 @@ def api_move_async():
                     newp = move_with_robocopy(p, dest, repo_dir=repo_dir)
                 else:
                     newp = move_one_fast(p, dest, on_progress=on_progress, repo_dir=repo_dir)
+
+                # Log to upload_log worksheet
+                if log_to_sheets:
+                    try:
+                        timestamp = datetime.utcnow().isoformat() + 'Z'
+                        log_upload(sa_json, sheet_name, newp, timestamp)
+                    except Exception as e:
+                        # Don't fail the move if logging fails
+                        print(f"Warning: Failed to log to sheets: {e}")
 
                 moved_count += 1
                 bytes_moved += size_before

@@ -13,14 +13,34 @@ MANAGED_HEADERS = [
     'fps','duration_sec','has_audio','created_iso','modified_iso'
 ]
 
-def open_sheet(sa_json_path: str, sheet_name: str):
+def open_sheet(sa_json_path: str, sheet_name: str, worksheet_name: str = None):
+    """
+    Open a Google Sheet and return a specific worksheet.
+
+    Args:
+        sa_json_path: Path to service account JSON file
+        sheet_name: Name of the Google Sheets document
+        worksheet_name: Name of the worksheet/tab to open. If None, opens first sheet.
+
+    Returns:
+        The requested worksheet object
+    """
     creds = ServiceAccountCredentials.from_json_keyfile_name(sa_json_path, SCOPE)
     client = gspread.authorize(creds)
     try:
         sh = client.open(sheet_name)
     except gspread.SpreadsheetNotFound:
         sh = client.create(sheet_name)
-    ws = sh.sheet1
+
+    # Get the desired worksheet
+    if worksheet_name:
+        try:
+            ws = sh.worksheet(worksheet_name)
+        except gspread.WorksheetNotFound:
+            # Create the worksheet if it doesn't exist
+            ws = sh.add_worksheet(title=worksheet_name, rows=1000, cols=20)
+    else:
+        ws = sh.sheet1
 
     # Ensure header row exists; do NOT wipe existing custom columns.
     existing = ws.row_values(1)
@@ -138,3 +158,47 @@ def sync_records(ws, records: list):
         ws.batch_update(batch_updates)
     if appends:
         ws.append_rows(appends)
+
+
+def log_upload(sa_json_path: str, sheet_name: str, file_path: str, timestamp: str):
+    """
+    Log a file upload/processing event to the 'upload_log' worksheet.
+
+    Args:
+        sa_json_path: Path to service account JSON file
+        sheet_name: Name of the Google Sheets document
+        file_path: Full path of the file being logged
+        timestamp: ISO timestamp of when the file was processed
+    """
+    from media_utils import parse_version
+    import os
+
+    # Open the upload_log worksheet (will be created if doesn't exist)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(sa_json_path, SCOPE)
+    client = gspread.authorize(creds)
+    try:
+        sh = client.open(sheet_name)
+    except gspread.SpreadsheetNotFound:
+        sh = client.create(sheet_name)
+
+    # Get or create upload_log worksheet
+    try:
+        ws = sh.worksheet('upload_log')
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title='upload_log', rows=1000, cols=10)
+
+    # Ensure headers exist
+    headers = ws.row_values(1)
+    if not headers:
+        ws.append_row(['timestamp', 'version', 'ext', 'path'])
+
+    # Extract file information
+    filename = os.path.basename(file_path)
+    _, ext = os.path.splitext(filename)
+    ext = ext.lstrip('.')  # Remove leading dot
+
+    parsed = parse_version(filename)
+    version = parsed.get('version', '')
+
+    # Append the log entry
+    ws.append_row([timestamp, version, ext, file_path])
