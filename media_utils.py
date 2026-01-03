@@ -8,8 +8,8 @@ from pymediainfo import MediaInfo
 import ffmpeg
 import errno
 
-VIDEO_EXTS = {'.mp4', '.mov', '.mxf', '.mkv', '.avi', '.m4v', '.webm', '.wmv', '.png'}
-AUDIO_EXTS = {'.wav', '.aiff', '.aif', '.mp3', '.m4a', '.flac', '.ogg'}
+VIDEO_EXTS = {'.mp4', '.mov', '.mxf', '.mkv', '.avi', '.m4v', '.webm', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts', '.mts', '.3gp', '.3g2', '.flv', '.vob', '.ogv', '.dv', '.asf', '.qt', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.exr', '.dpx', '.bmp', '.gif', '.webp', '.tga', '.cin'}
+AUDIO_EXTS = {'.wav', '.aiff', '.aif', '.mp3', '.m4a', '.flac', '.ogg', '.aac', '.opus', '.wma', '.oga', '.ac3', '.dts', '.alac', '.ape', '.mka'}
 MEDIA_EXTS = VIDEO_EXTS | AUDIO_EXTS
 
 VERSION_RE = re.compile(r"^(?P<stem>.*)_v(?P<ver>\d{1,3})$", re.IGNORECASE)
