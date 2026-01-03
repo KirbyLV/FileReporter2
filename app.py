@@ -68,6 +68,12 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/favicon.ico')
+def favicon():
+    from flask import send_from_directory
+    return send_from_directory('static/assets', 'FR_Logo.png', mimetype='image/png')
+
+
 @app.route('/settings')
 def settings_page():
     cfg = load_settings()
@@ -153,6 +159,7 @@ def api_move():
     sa_json = cfg.get('service_account_json')
     sheet_name = cfg.get('sheet_name')
     log_to_sheets = bool(sa_json and sheet_name and os.path.isfile(sa_json))
+    print(f"📊 Upload logging: {'ENABLED' if log_to_sheets else 'DISABLED'} (sa_json={sa_json}, exists={os.path.isfile(sa_json) if sa_json else False})")
 
     payload = request.get_json(force=True)
     paths = payload.get('paths', [])
@@ -175,9 +182,12 @@ def api_move():
                 try:
                     timestamp = datetime.utcnow().isoformat() + 'Z'
                     log_upload(sa_json, sheet_name, newp, timestamp)
+                    print(f"✅ Logged to upload_log: {newp}")
                 except Exception as e:
                     # Don't fail the move if logging fails
-                    print(f"Warning: Failed to log to sheets: {e}")
+                    import traceback
+                    print(f"❌ WARNING: Failed to log to upload_log worksheet: {e}")
+                    traceback.print_exc()
 
         except Exception as e:
             errors.append(f"{p}: {e}")
@@ -239,8 +249,9 @@ def api_job(job_id):
 
 @app.route('/api/sync-sheets', methods=['POST'])
 def api_sync_sheets():
+    from datetime import datetime
     try:
-        repo_dir, _, _ = cfg_paths()
+        repo_dir, quarantine_dir, show_media_dir = cfg_paths()
         cfg = load_settings()
         sa = cfg.get('service_account_json')
         sheet = cfg.get('sheet_name')
@@ -256,7 +267,27 @@ def api_sync_sheets():
         ws = open_sheet(sa, sheet)
 
         sync_records(ws, records)
-        return jsonify({'status': 'ok', 'count': len(records)})
+
+        # Also log files in show_media_dir to upload_log
+        logged_count = 0
+        print("📊 Syncing upload_log for files in show_media_dir...")
+        try:
+            show_files = scan_repo(show_media_dir)
+            timestamp = datetime.utcnow().isoformat() + 'Z'
+            for file_record in show_files:
+                try:
+                    file_path = file_record.get('path', '')
+                    if file_path:
+                        log_upload(sa, sheet, file_path, timestamp)
+                        logged_count += 1
+                        print(f"  ✅ Logged: {os.path.basename(file_path)}")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to log {file_path}: {e}")
+            print(f"📊 Upload log sync complete: {logged_count} files logged")
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to sync upload_log: {e}")
+
+        return jsonify({'status': 'ok', 'count': len(records), 'logged': logged_count})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -310,7 +341,9 @@ def api_move_async():
             sa_json = sheets_cfg.get('service_account_json')
             sheet_name = sheets_cfg.get('sheet_name')
             log_to_sheets = bool(sa_json and sheet_name and os.path.isfile(sa_json))
-        except Exception:
+            print(f"📊 Upload logging (async): {'ENABLED' if log_to_sheets else 'DISABLED'} (sa_json={sa_json}, exists={os.path.isfile(sa_json) if sa_json else False})")
+        except Exception as e:
+            print(f"❌ Failed to load sheets config for logging: {e}")
             log_to_sheets = False
 
         for p in paths:
@@ -349,9 +382,12 @@ def api_move_async():
                     try:
                         timestamp = datetime.utcnow().isoformat() + 'Z'
                         log_upload(sa_json, sheet_name, newp, timestamp)
+                        print(f"✅ Logged to upload_log: {newp}")
                     except Exception as e:
                         # Don't fail the move if logging fails
-                        print(f"Warning: Failed to log to sheets: {e}")
+                        import traceback
+                        print(f"❌ WARNING: Failed to log to upload_log worksheet: {e}")
+                        traceback.print_exc()
 
                 moved_count += 1
                 bytes_moved += size_before

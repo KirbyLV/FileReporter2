@@ -1,6 +1,7 @@
 
 services:
   media:
+    image: jspodick/filereporter2:latest
     build: .
     ports:
       - "8008:8008"
@@ -10,7 +11,7 @@ services:
       QUARANTINE_DIR: /repo_quarantine
       CONFIG_DIR: /config
       GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
-      GOOGLE_SHEET_NAME: Media Repo Inventory
+      GOOGLE_SHEET_NAME: FileReporter2-Test
     volumes:
       - "/Users/jspodick/Documents/Video/TestFolder:/repo:rw"
       - "/Users/jspodick/Documents/Video/test_show:/repo_show:rw"
