@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileReporter2 Configurator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='configurator.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>FileReporter2 Configurator</h1>
+            <p class="subtitle">Configure and manage your FileReporter2 Docker container</p>
+        </header>
+
+        <div class="status-bar" id="statusBar">
+            <span id="statusText">Loading...</span>
+            <span id="containerStatus" class="status-badge">Unknown</span>
+        </div>
+
+        <div class="config-form">
+            <h2>Configuration</h2>
+
+            <div class="form-group">
+                <label for="repoDir">Repo Directory</label>
+                <div class="input-with-button">
+                    <input type="text" id="repoDir" placeholder="/path/to/repo">
+                    <button onclick="openDirBrowser('repoDir')" class="btn-secondary">Browse</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="showDir">Show Directory</label>
+                <div class="input-with-button">
+                    <input type="text" id="showDir" placeholder="/path/to/show">
+                    <button onclick="openDirBrowser('showDir')" class="btn-secondary">Browse</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="quarantineDir">Quarantine Directory</label>
+                <div class="input-with-button">
+                    <input type="text" id="quarantineDir" placeholder="/path/to/quarantine">
+                    <button onclick="openDirBrowser('quarantineDir')" class="btn-secondary">Browse</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="sheetName">Google Sheet Name</label>
+                <input type="text" id="sheetName" placeholder="Media Repo Inventory">
+            </div>
+
+            <div class="form-group">
+                <label>Service Account JSON</label>
+                <div class="file-upload">
+                    <input type="file" id="serviceAccountFile" accept=".json" onchange="handleFileUpload(this)">
+                    <span id="uploadStatus"></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Deployment Mode</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="deployMode" value="image" checked>
+                        Use Prebuilt Image
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="deployMode" value="build">
+                        Build Locally
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group" id="imageRefGroup">
+                <label for="imageRef">Image Reference</label>
+                <input type="text" id="imageRef" placeholder="jspodick/filereporter2:latest">
+            </div>
+
+            <div class="button-group">
+                <button onclick="saveConfig()" class="btn-primary">Save Configuration</button>
+                <button onclick="generateCompose()" class="btn-primary">Generate docker-compose.yml</button>
+            </div>
+        </div>
+
+        <div class="actions">
+            <h2>Docker Actions</h2>
+
+            <div class="button-group">
+                <button onclick="startApp()" class="btn-success" id="btnStart">Start App</button>
+                <button onclick="stopApp()" class="btn-danger" id="btnStop">Stop App</button>
+                <button onclick="restartApp()" class="btn-warning" id="btnRestart">Restart App</button>
+                <button onclick="openMainApp()" class="btn-secondary" id="btnOpenApp">Open Main App</button>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <h2>Container Logs</h2>
+            <div class="logs-controls">
+                <button onclick="startLogStream()" class="btn-secondary" id="btnStartLogs">View Logs</button>
+                <button onclick="stopLogStream()" class="btn-secondary" id="btnStopLogs" disabled>Stop Logs</button>
+                <button onclick="clearLogs()" class="btn-secondary">Clear</button>
+            </div>
+            <div class="console" id="console"></div>
+        </div>
+    </div>
+
+    <!-- Directory Browser Modal -->
+    <div id="dirBrowserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Directory</h3>
+                <button onclick="closeDirBrowser()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="current-path">
+                    <strong>Current Path:</strong>
+                    <span id="currentPath">/</span>
+                </div>
+                <div id="dirList" class="directory-list">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="navigateUp()" class="btn-secondary" id="btnUp">Up</button>
+                <button onclick="selectCurrentDir()" class="btn-primary">Select This Directory</button>
+                <button onclick="closeDirBrowser()" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="messageToast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='configurator.js') }}"></script>
+</body>
+</html>

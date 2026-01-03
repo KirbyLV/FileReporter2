@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   docker:
-    name: Build & Push Docker image
+    name: Build & Push Docker image (Main App)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build & push
+      - name: Build & push main app
         uses: docker/build-push-action@v6
         with:
           push: true
@@ -29,8 +29,27 @@ jobs:
             jspodick/filereporter2:${{ github.ref_name }}
             jspodick/filereporter2:latest
 
-  configurator:
-    name: Build Configurator (macOS & Windows)
+  docker-configurator:
+    name: Build & Push Docker image (Web Configurator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push web configurator
+        uses: docker/build-push-action@v6
+        with:
+          context: ./configurator-web
+          push: true
+          tags: |
+            jspodick/filereporter2-configurator:${{ github.ref_name }}
+            jspodick/filereporter2-configurator:latest
+
+  configurator-legacy:
+    name: Build Legacy Configurator (macOS & Windows)
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
@@ -41,9 +60,9 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyinstaller
-      - name: Build Configurator
+      - name: Build Legacy Configurator
         run: |
-          pyinstaller --onefile --windowed --name "FileReporter2 Configurator" configurator.py
+          pyinstaller --onefile --windowed --name "FileReporter2 Configurator Legacy" configurator-legacy.py
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +73,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [docker, configurator]
+    needs: [docker, docker-configurator, configurator-legacy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

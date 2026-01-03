@@ -1,3 +1,22 @@
+"""
+LEGACY TKINTER CONFIGURATOR
+
+This is the legacy Tkinter-based configurator. It is kept for backward compatibility.
+
+For the new web-based configurator, see: configurator-web/
+The web configurator offers:
+- Cross-platform compatibility without platform-specific executables
+- Easy sharing via Docker container
+- Web-based directory browser
+- Better Docker integration
+
+To use the web configurator:
+    cd configurator-web
+    docker-compose up
+
+Then open http://localhost:8009 in your browser.
+"""
+
 import os, sys, subprocess, platform, json, shlex
 import tkinter as tk
 from tkinter import filedialog, messagebox

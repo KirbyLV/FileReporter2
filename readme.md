@@ -1,21 +1,71 @@
 # File Reporter 2
-A Docker-ready Flask App 
+A Docker-ready Flask App
 
 A complete, ready-to-run Flask application to scan a media repository, view metadata, bulk move assets (approve/quarantine), generate Hap/Hap Alpha proxies to /repo/_proxies, extract audio to a Hap (black video) + PCM MOV, and sync records to Google Sheets with _vNN version tracking.
 
 ## To Use
-### Download
-+ If on PC: Download the exe file under releases and launch. You may need to disable anti-virus, I just dont have the app signed.  
-+ If on Mac: Downlaod configurator.py and run using a python launcher.  
-The configurator app will pull everything else needed from Docker hub. web connection is needed.  
 
-If desired, you can clone the entire git repo and run from configurator using "build locally" instead of pulling the prebuilt image form docker hub.  
+### Quick Start: Web Configurator (Recommended)
 
-### Initial Configuration:
-Launch `Configurator.py` and populate the values the app asks for
+The easiest way to get started is with the **new web-based configurator**. It works on all platforms and requires no downloads:
+
+1. Ensure Docker Desktop is running
+2. Run the configurator:
+   ```bash
+   docker run -d -p 8009:8009 \
+     -v /var/run/docker.sock:/var/run/docker.sock \
+     -v $(pwd)/config:/config \
+     -v $(pwd):/workspace \
+     -v /:/host:ro \
+     --name filereporter2-config \
+     jspodick/filereporter2-configurator:latest
+   ```
+3. Open http://localhost:8009 in your browser
+4. Use the web interface to configure and start FileReporter2
+
+**Benefits:**
+- No platform-specific executables needed
+- Works on macOS, Windows, and Linux
+- Web-based directory browser
+- Real-time log viewing
+- Easy sharing via Docker image
+
+For detailed instructions, see [configurator-web/README.md](configurator-web/README.md)
+
+### Alternative: Legacy Configurator
+
+If you prefer a desktop app, you can still use the legacy Tkinter configurator:
+
++ **Windows**: Download the exe file from releases. You may need to disable anti-virus (app is not signed).
++ **Mac/Linux**: Download `configurator-legacy.py` and run with Python.
+
+The configurator will pull everything else needed from Docker Hub (internet connection required).
+
+If desired, you can clone the entire git repo and run from configurator using "build locally" instead of pulling the prebuilt image from Docker Hub.  
+
+### Initial Configuration
+
+#### Using the Web Configurator
+
+1. Open http://localhost:8009 in your browser
+2. Use the web-based directory browser to select:
+   - **Repo Folder**: The location where all the raw content will arrive, while awaiting QC
+   - **Show Folder**: The location of the approved media, to be sync'd to show servers
+   - **Quarantine Folder**: A holding purgatory for items with issues or items that need to be reencoded
+3. Upload your **Service Account JSON** file (optional, for Google Sheets sync)
+4. Enter your **Google Sheet Name** (optional)
+5. Choose deployment mode:
+   - **Use Prebuilt Image**: Pulls from Docker Hub (recommended)
+   - **Build Locally**: Builds from source in your repository
+6. Click "Save Configuration" and "Generate docker-compose.yml"
+7. Click "Start App" to launch FileReporter2
+
+#### Using the Legacy Configurator (Desktop App)
+
+Launch `configurator-legacy.py` and populate the values the app asks for:
 <img width="913" height="625" alt="Screenshot-FileReporter2-Configurator" src="https://github.com/user-attachments/assets/a0e14a9b-bf23-45cc-9740-c402f289f9ad" />
 
-Select the following by either typing in the paths or using the browse button:
+Select the following by typing in the paths or using the browse button:
 + Repo Folder: The location where all the raw content will arrive, while awaiting QC.
 + Show Folder: The location of the approved media, to be sync'd to show servers.
 + Quarantine Folder: A holding purgatory for items with issues or items that need to be reencoded.
@@ -28,20 +78,42 @@ Non mandatory:
 
 Once fields are popualted, the buttons to build the docker file and launch the app will become available.
 
-### Launching the app
-Ensure docker desktop is running and has access to the file locations needed.
+### Launching the App
 
-1. If google sheets is being used, click "Copy SA JSON to /config"
+#### With Web Configurator
+
+Ensure Docker Desktop is running and has access to the file locations needed.
+
+1. Configure all directories and settings in the web UI (http://localhost:8009)
+2. Click "Save Configuration"
+3. Click "Generate docker-compose.yml"
+4. Click "Start App" - this will run `docker compose up -d`
+5. Once started, click "Open Main App" to access FileReporter2 at http://localhost:8008
+
+**Controls:**
+- **View Logs**: Real-time log streaming in the browser
+- **Stop Logs**: Stop the log stream
+- **Stop App**: Shuts down the Docker containers (`docker compose down`)
+- **Restart App**: Restarts the Docker containers
+- **Refresh Status**: Check current container status
+
+All Docker containers and their status are also visible in Docker Desktop.
+
+#### With Legacy Configurator (Desktop App)
+
+Ensure Docker Desktop is running and has access to the file locations needed.
+
+1. If Google Sheets is being used, click "Copy SA JSON to /config"
 2. Click on "Write docker-compose.yml"
-3. Click on "Start App". This will run `docker compose up-d` and will start the application. Yopu should see data process in the status frame.
-4. Click on "Open Web Portal" to launch the front end web portal in your browser. 
+3. Click on "Start App". This will run `docker compose up -d` and will start the application. You should see data process in the status frame.
+4. Click on "Open Web Portal" to launch the front end web portal in your browser (http://localhost:8008)
 
-Other controls:
-+ View Log: shows the log in the status display, including any docker errors. This will continue to run until "Stop Log" is pressed.
-+ Stop App: Shutsdown the docker containers, basically jsut runs `docker compose down `.
-+ Restart App: restarts the docker containers. If repos are changed, you should stop and then start to grab the new docker compose file.
+**Other controls:**
+- **View Log**: Shows the log in the status display, including any docker errors. This will continue to run until "Stop Log" is pressed.
+- **Stop App**: Shuts down the docker containers (`docker compose down`)
+- **Restart App**: Restarts the docker containers. If repos are changed, you should stop and then start to grab the new docker compose file.
 
-All docker containers and their status should also be visible in docker desktop.
+All Docker containers and their status are also visible in Docker Desktop.
 
 ### If on Apple Silicon
 You may need to edit the docker-compose.yaml file to direct docker to emulate the proper platform. 
@@ -109,22 +181,36 @@ The unique key is still stem (the filename base before _vNN). If you change stem
 
 ## Project Structure
 ```
-media-repo-manager/
-├─ app.py
-├─ media_utils.py
-├─ sheets_sync.py
-├─ configurator.py
-├─ static/
+FileReporter2/
+├─ app.py                          # Main Flask application
+├─ media_utils.py                  # Media scanning and processing
+├─ sheets_sync.py                  # Google Sheets integration
+├─ configurator-legacy.py          # Legacy Tkinter configurator (desktop)
+├─ start-configurator.sh           # Quick start script for web configurator
+├─ static/                         # Main app frontend assets
 │  ├─ app.js
-│  └─ app.css
-|  └─ assets/
+│  ├─ app.css
+│  └─ assets/
 │    └─ FR_Logo.png
-├─ templates/
+├─ templates/                      # Main app HTML templates
 │  ├─ index.html
 │  └─ settings.html
+├─ configurator-web/               # Web-based configurator (NEW)
+│  ├─ configurator_app.py          # Flask backend
+│  ├─ docker_manager.py            # Docker API wrapper
+│  ├─ compose_generator.py         # Compose file generator
+│  ├─ file_browser.py              # Directory browser API
+│  ├─ static/                      # Configurator frontend
+│  │  ├─ configurator.js
+│  │  └─ configurator.css
+│  ├─ templates/
+│  │  └─ configurator.html
+│  ├─ Dockerfile                   # Configurator container
+│  ├─ docker-compose.yml           # Run configurator
+│  └─ README.md                    # Configurator docs
 ├─ requirements.txt
-├─ Dockerfile
-└─ docker-compose.yml
+├─ Dockerfile                      # Main app container
+└─ docker-compose.yml              # Generated by configurator
 ```
 ## Project Setup, in docker
 Ensure Docker Desktop has access to the media and folder locations:
