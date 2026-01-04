@@ -112,8 +112,14 @@ $('#extractAudio').addEventListener('click', async ()=>{
 });
 
 $('#sync').addEventListener('click', async ()=>{
-  const res = await postJSON('/api/sync-sheets', {});
-  alert(res.error || `Synced ${res.count} records to Google Sheet`);
+  try {
+    const res = await postJSON('/api/sync-sheets', {});
+    alert(`✅ Successfully synced ${res.count} records to Google Sheet\n${res.logged} files logged to upload_log`);
+  } catch (error) {
+    const errorMsg = error.message || 'Unknown error occurred';
+    alert(`❌ Google Sheets Sync Failed\n\n${errorMsg}\n\nPlease check:\n• Service Account JSON is uploaded in Settings\n• Sheet name is correct\n• Service account has edit access to the sheet\n• Internet connection is available`);
+    console.error('Sync error:', error);
+  }
 });
 
 function addJob(id){

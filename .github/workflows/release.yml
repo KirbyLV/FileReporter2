@@ -48,8 +48,8 @@ jobs:
             jspodick/filereporter2-configurator:${{ github.ref_name }}
             jspodick/filereporter2-configurator:latest
 
-  configurator-legacy:
-    name: Build Legacy Configurator (macOS & Windows)
+  configurator:
+    name: Build Configurator (macOS & Windows)
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
@@ -59,10 +59,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pyinstaller
-      - name: Build Legacy Configurator
+      - run: pip install pyinstaller customtkinter
+      - name: Build Configurator
         run: |
-          pyinstaller --onefile --windowed --name "FileReporter2 Configurator Legacy" configurator-legacy.py
+          pyinstaller --onefile --windowed --name "FileReporter2 Configurator" configurator.py
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -73,7 +73,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [docker, docker-configurator, configurator-legacy]
+    needs: [docker, docker-configurator, configurator]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,12 +98,19 @@ jobs:
               ports:
                 - "8008:8008"
               environment:
+                REPO_DIR: /repo
+                SHOW_MEDIA_DIR: /repo_show
+                QUARANTINE_DIR: /repo_quarantine
                 CONFIG_DIR: /config
                 GOOGLE_SERVICE_ACCOUNT_JSON: /config/google-service-account.json
                 GOOGLE_SHEET_NAME: Media Repo Inventory
               volumes:
-                - /Volumes:/host/Volumes:ro   # macOS example
-                - ./config:/config:rw
+                # IMPORTANT: Replace these paths with your actual directories
+                # Use the configurator to generate this file with correct paths
+                - "/path/to/your/repo:/repo:rw"
+                - "/path/to/your/show:/repo_show:rw"
+                - "/path/to/your/quarantine:/repo_quarantine:rw"
+                - "./config:/config:rw"
           YML
 
       - name: Create Release

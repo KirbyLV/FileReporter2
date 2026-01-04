@@ -27,7 +27,20 @@
     <div class="row"><label>Show Media Folder</label><input id="show_media_dir" placeholder="/repo_show" /></div>
     <div class="row"><label>Quarantine Folder</label><input id="quarantine_dir" placeholder="/repo_quarantine" /></div> -->
     <div class="row"><label>Google Sheet Name</label><input id="sheet_name" placeholder="Media Repo Inventory" /></div>
-    <div class="row"><label>Service Account JSON Path</label><input id="service_account_json" placeholder="/config/google-service-account.json" /></div>
+
+    <div class="row">
+      <label>Upload Service Account JSON</label>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="file" id="sa_json_file" accept=".json" style="flex: 1;" />
+        <button id="upload_json" style="white-space: nowrap;">Upload JSON</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Current JSON Path</label>
+      <input id="service_account_json" placeholder="/config/google-service-account.json" readonly style="background: #f5f5f5; cursor: not-allowed;" />
+    </div>
+
     <label>
       <input type="checkbox" id="use_robocopy" name="use_robocopy" value="true"
        {% if settings.use_robocopy %}checked{% endif %}>
@@ -43,31 +56,82 @@
     async function load() {
       const r = await fetch('/api/settings');
       const d = await r.json();
-    
+
       // Only populate existing inputs
       for (const k of ['sheet_name','service_account_json']) {
         const el = document.getElementById(k);
         if (el && d[k] != null) el.value = d[k];
       }
-    
+
       // Handle Robocopy checkbox
       const chk = document.getElementById('use_robocopy');
       if (chk && d.use_robocopy) chk.checked = true;
     }
-  
+
+    async function uploadJSON() {
+      const fileInput = document.getElementById('sa_json_file');
+      const file = fileInput.files[0];
+      const msg = document.getElementById('msg');
+
+      if (!file) {
+        msg.textContent = 'Please select a JSON file first';
+        msg.style.color = 'tomato';
+        return;
+      }
+
+      if (!file.name.endsWith('.json')) {
+        msg.textContent = 'File must be a .json file';
+        msg.style.color = 'tomato';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('sa_json', file);
+
+      try {
+        msg.textContent = 'Uploading...';
+        msg.style.color = '#666';
+
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          msg.textContent = data.error || 'Upload failed';
+          msg.style.color = 'tomato';
+          return;
+        }
+
+        msg.textContent = '✅ JSON uploaded successfully!';
+        msg.style.color = 'limegreen';
+
+        // Reload settings to show updated path
+        await load();
+
+        // Clear file input
+        fileInput.value = '';
+      } catch (error) {
+        msg.textContent = 'Upload failed: ' + error.message;
+        msg.style.color = 'tomato';
+      }
+    }
+
     async function save() {
       const body = {
         sheet_name: document.getElementById('sheet_name').value.trim(),
         service_account_json: document.getElementById('service_account_json').value.trim(),
         use_robocopy: document.getElementById('use_robocopy').checked
       };
-    
+
       const res = await fetch('/api/settings', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify(body)
       });
-    
+
       const data = await res.json().catch(()=>({}));
       const msg = document.getElementById('msg');
       if (!res.ok) {
@@ -78,8 +142,9 @@
       msg.textContent = 'Saved!';
       msg.style.color = 'limegreen';
     }
-  
+
     document.getElementById('save').addEventListener('click', save);
+    document.getElementById('upload_json').addEventListener('click', uploadJSON);
     load();
   </script>
 

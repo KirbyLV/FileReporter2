@@ -5,43 +5,44 @@ A complete, ready-to-run Flask application to scan a media repository, view meta
 
 ## To Use
 
-### Quick Start: Web Configurator (Recommended)
+### Quick Start: Desktop Configurator (Recommended)
 
-The easiest way to get started is with the **new web-based configurator**. It works on all platforms and requires no downloads:
+The easiest way to get started is with the **CustomTkinter configurator**:
 
-1. Ensure Docker Desktop is running
-2. Run the configurator:
-   ```bash
-   docker run -d -p 8009:8009 \
-     -v /var/run/docker.sock:/var/run/docker.sock \
-     -v $(pwd)/config:/config \
-     -v $(pwd):/workspace \
-     -v /:/host:ro \
-     --name filereporter2-config \
-     jspodick/filereporter2-configurator:latest
-   ```
-3. Open http://localhost:8009 in your browser
-4. Use the web interface to configure and start FileReporter2
+**Option 1: Download Pre-built Executable**
+1. Download the latest release from the [Releases page](https://github.com/jspodick/FileReporter2/releases)
+2. **Windows**: Run `FileReporter2 Configurator.exe`
+3. **macOS**: Run `FileReporter2 Configurator.app`
+4. The configurator has a modern dark UI with native file/directory pickers
+
+**Option 2: Run from Python**
+```bash
+pip install customtkinter
+python configurator.py
+```
 
 **Benefits:**
-- No platform-specific executables needed
-- Works on macOS, Windows, and Linux
-- Web-based directory browser
-- Real-time log viewing
-- Easy sharing via Docker image
+- ✅ Native file/directory pickers (just like any desktop app)
+- ✅ Modern dark theme with red/yellow/gold accents
+- ✅ Cross-platform (macOS, Windows, Linux)
+- ✅ Standalone executable - no Python needed for end users
+- ✅ All Docker management features built-in
 
-For detailed instructions, see [configurator-web/README.md](configurator-web/README.md)
+### Alternative: Web Configurator (Advanced)
 
-### Alternative: Legacy Configurator
+For server environments or remote management, there's also a web-based configurator:
 
-If you prefer a desktop app, you can still use the legacy Tkinter configurator:
+```bash
+docker run -d -p 8009:8009 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd)/config:/config \
+  -v $(pwd):/workspace \
+  jspodick/filereporter2-configurator:latest
+```
 
-+ **Windows**: Download the exe file from releases. You may need to disable anti-virus (app is not signed).
-+ **Mac/Linux**: Download `configurator-legacy.py` and run with Python.
+Then open http://localhost:8009 - Note: Web browsers cannot provide native file pickers, so you'll need to type paths manually.
 
-The configurator will pull everything else needed from Docker Hub (internet connection required).
-
-If desired, you can clone the entire git repo and run from configurator using "build locally" instead of pulling the prebuilt image from Docker Hub.  
+For detailed web configurator instructions, see [configurator-web/README.md](configurator-web/README.md)  
 
 ### Initial Configuration
 

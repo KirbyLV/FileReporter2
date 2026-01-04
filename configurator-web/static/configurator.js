@@ -330,98 +330,63 @@ function clearLogs() {
     document.getElementById('console').innerHTML = '';
 }
 
-// --- Directory Browser ---
+// --- Path Validation ---
 
-async function openDirBrowser(inputId) {
-    currentTargetInput = inputId;
-    currentBrowserPath = null;
+async function validatePaths() {
+    const paths = [
+        { id: 'repoDir', label: 'Repo Directory' },
+        { id: 'showDir', label: 'Show Directory' },
+        { id: 'quarantineDir', label: 'Quarantine Directory' }
+    ];
 
-    const modal = document.getElementById('dirBrowserModal');
-    modal.style.display = 'flex';
+    let allValid = true;
+    let messages = [];
 
-    // Load initial directory list
-    await loadDirectory(null);
-}
+    for (const pathInfo of paths) {
+        const input = document.getElementById(pathInfo.id);
+        const path = input.value.trim();
 
-function closeDirBrowser() {
-    const modal = document.getElementById('dirBrowserModal');
-    modal.style.display = 'none';
-    currentTargetInput = null;
-    currentBrowserPath = null;
-}
-
-async function loadDirectory(path) {
-    try {
-        const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.error) {
-            showMessage('Error: ' + data.error, 'error');
-            return;
+        if (!path) {
+            messages.push(`❌ ${pathInfo.label}: No path entered`);
+            input.style.borderColor = 'var(--accent-red)';
+            allValid = false;
+            continue;
         }
 
-        currentBrowserPath = data.current_path;
+        try {
+            const response = await fetch('/api/validate-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
 
-        // Update current path display
-        document.getElementById('currentPath').textContent = data.current_path_host || '/';
+            const result = await response.json();
 
-        // Update up button
-        document.getElementById('btnUp').disabled = !data.parent;
-
-        // Populate directory list
-        const dirList = document.getElementById('dirList');
-        dirList.innerHTML = '';
-
-        if (data.directories.length === 0) {
-            dirList.innerHTML = '<div class="empty-dir">No subdirectories</div>';
-            return;
+            if (result.valid) {
+                messages.push(`✓ ${pathInfo.label}: Valid`);
+                input.style.borderColor = 'var(--success-text)';
+            } else {
+                messages.push(`❌ ${pathInfo.label}: ${result.error}`);
+                input.style.borderColor = 'var(--accent-red)';
+                allValid = false;
+            }
+        } catch (error) {
+            messages.push(`❌ ${pathInfo.label}: Error validating`);
+            input.style.borderColor = 'var(--accent-red)';
+            allValid = false;
         }
-
-        data.directories.forEach(dir => {
-            const dirItem = document.createElement('div');
-            dirItem.className = 'dir-item';
-            dirItem.textContent = '📁 ' + dir.name;
-            dirItem.onclick = () => loadDirectory(dir.path);
-            dirList.appendChild(dirItem);
-        });
-
-    } catch (error) {
-        showMessage('Error loading directory: ' + error.message, 'error');
     }
-}
 
-async function navigateUp() {
-    if (!currentBrowserPath) return;
+    // Display results in console
+    log('--- Path Validation Results ---');
+    messages.forEach(msg => log(msg));
+    log('---');
 
-    try {
-        const url = `/api/browse?path=${encodeURIComponent(currentBrowserPath)}`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.parent) {
-            await loadDirectory(data.parent);
-        }
-    } catch (error) {
-        showMessage('Error navigating up: ' + error.message, 'error');
+    if (allValid) {
+        showMessage('All paths are valid!', 'success');
+    } else {
+        showMessage('Some paths are invalid. Check the console for details.', 'error');
     }
-}
-
-function selectCurrentDir() {
-    if (!currentTargetInput || !currentBrowserPath) return;
-
-    // Get the host path (without /host prefix)
-    fetch(`/api/browse?path=${encodeURIComponent(currentBrowserPath)}`)
-        .then(response => response.json())
-        .then(data => {
-            const hostPath = data.current_path_host;
-            document.getElementById(currentTargetInput).value = hostPath;
-            closeDirBrowser();
-            showMessage('Directory selected', 'success');
-        })
-        .catch(error => {
-            showMessage('Error selecting directory: ' + error.message, 'error');
-        });
 }
 
 // --- UI Helpers ---

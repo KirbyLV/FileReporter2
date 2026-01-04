@@ -23,26 +23,20 @@
 
             <div class="form-group">
                 <label for="repoDir">Repo Directory</label>
-                <div class="input-with-button">
-                    <input type="text" id="repoDir" placeholder="/path/to/repo">
-                    <button onclick="openDirBrowser('repoDir')" class="btn-secondary">Browse</button>
-                </div>
+                <input type="text" id="repoDir" placeholder="e.g. /Users/yourname/Documents/Video/repo">
+                <small class="hint">Type or paste the full path to your repo folder</small>
             </div>
 
             <div class="form-group">
                 <label for="showDir">Show Directory</label>
-                <div class="input-with-button">
-                    <input type="text" id="showDir" placeholder="/path/to/show">
-                    <button onclick="openDirBrowser('showDir')" class="btn-secondary">Browse</button>
-                </div>
+                <input type="text" id="showDir" placeholder="e.g. /Users/yourname/Documents/Video/show">
+                <small class="hint">Type or paste the full path to your show folder</small>
             </div>
 
             <div class="form-group">
                 <label for="quarantineDir">Quarantine Directory</label>
-                <div class="input-with-button">
-                    <input type="text" id="quarantineDir" placeholder="/path/to/quarantine">
-                    <button onclick="openDirBrowser('quarantineDir')" class="btn-secondary">Browse</button>
-                </div>
+                <input type="text" id="quarantineDir" placeholder="e.g. /Users/yourname/Documents/Video/quarantine">
+                <small class="hint">Type or paste the full path to your quarantine folder</small>
             </div>
 
             <div class="form-group">
@@ -78,6 +72,7 @@
             </div>
 
             <div class="button-group">
+                <button onclick="validatePaths()" class="btn-secondary">Validate Paths</button>
                 <button onclick="saveConfig()" class="btn-primary">Save Configuration</button>
                 <button onclick="generateCompose()" class="btn-primary">Generate docker-compose.yml</button>
             </div>
@@ -102,30 +97,6 @@
                 <button onclick="clearLogs()" class="btn-secondary">Clear</button>
             </div>
             <div class="console" id="console"></div>
-        </div>
-    </div>
-
-    <!-- Directory Browser Modal -->
-    <div id="dirBrowserModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Select Directory</h3>
-                <button onclick="closeDirBrowser()" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="current-path">
-                    <strong>Current Path:</strong>
-                    <span id="currentPath">/</span>
-                </div>
-                <div id="dirList" class="directory-list">
-                    <!-- Populated by JavaScript -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="navigateUp()" class="btn-secondary" id="btnUp">Up</button>
-                <button onclick="selectCurrentDir()" class="btn-primary">Select This Directory</button>
-                <button onclick="closeDirBrowser()" class="btn-secondary">Cancel</button>
-            </div>
         </div>
     </div>
 

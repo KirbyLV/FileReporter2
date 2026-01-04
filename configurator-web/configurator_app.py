@@ -275,18 +275,7 @@ def docker_logs():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# --- File Browser ---
-
-@app.route('/api/browse', methods=['GET'])
-def browse_directory():
-    """Browse directories on host filesystem."""
-    try:
-        path = request.args.get('path')
-        result = file_browser.list_directory(path)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+# --- Path Validation ---
 
 @app.route('/api/validate-path', methods=['POST'])
 def validate_path():

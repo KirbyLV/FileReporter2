@@ -24,36 +24,67 @@ def open_sheet(sa_json_path: str, sheet_name: str, worksheet_name: str = None):
 
     Returns:
         The requested worksheet object
+
+    Raises:
+        Exception: With specific error messages for common issues
     """
-    creds = ServiceAccountCredentials.from_json_keyfile_name(sa_json_path, SCOPE)
-    client = gspread.authorize(creds)
+    try:
+        creds = ServiceAccountCredentials.from_json_keyfile_name(sa_json_path, SCOPE)
+    except FileNotFoundError:
+        raise Exception(f"Service account JSON file not found: {sa_json_path}")
+    except ValueError as e:
+        raise Exception(f"Invalid service account JSON file: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to load credentials: {str(e)}")
+
+    try:
+        client = gspread.authorize(creds)
+    except Exception as e:
+        raise Exception(f"Authentication failed: {str(e)}")
+
     try:
         sh = client.open(sheet_name)
     except gspread.SpreadsheetNotFound:
-        sh = client.create(sheet_name)
+        try:
+            sh = client.create(sheet_name)
+            print(f"✅ Created new spreadsheet '{sheet_name}'")
+        except Exception as e:
+            raise Exception(f"Sheet '{sheet_name}' not found and could not be created. Make sure the service account has access to Google Drive API. Error: {str(e)}")
+    except Exception as e:
+        error_msg = str(e)
+        if 'PERMISSION_DENIED' in error_msg or '403' in error_msg:
+            raise Exception(f"Permission denied accessing sheet '{sheet_name}'. Make sure the sheet is shared with your service account email with Editor access.")
+        else:
+            raise Exception(f"Failed to open sheet '{sheet_name}': {error_msg}")
 
     # Get the desired worksheet
-    if worksheet_name:
-        try:
-            ws = sh.worksheet(worksheet_name)
-        except gspread.WorksheetNotFound:
-            # Create the worksheet if it doesn't exist
-            ws = sh.add_worksheet(title=worksheet_name, rows=1000, cols=20)
-    else:
-        ws = sh.sheet1
+    try:
+        if worksheet_name:
+            try:
+                ws = sh.worksheet(worksheet_name)
+            except gspread.WorksheetNotFound:
+                # Create the worksheet if it doesn't exist
+                ws = sh.add_worksheet(title=worksheet_name, rows=1000, cols=20)
+        else:
+            ws = sh.sheet1
+    except Exception as e:
+        raise Exception(f"Failed to access worksheet: {str(e)}")
 
     # Ensure header row exists; do NOT wipe existing custom columns.
-    existing = ws.row_values(1)
-    if not existing:
-        ws.append_row(MANAGED_HEADERS)
+    try:
         existing = ws.row_values(1)
+        if not existing:
+            ws.append_row(MANAGED_HEADERS)
+            existing = ws.row_values(1)
 
-    # Append any missing managed headers to the right
-    missing = [h for h in MANAGED_HEADERS if h not in existing]
-    if missing:
-        new_headers = existing + missing
-        ws.update(f"A1:{col_letter(len(new_headers))}1", [new_headers])
-        existing = new_headers
+        # Append any missing managed headers to the right
+        missing = [h for h in MANAGED_HEADERS if h not in existing]
+        if missing:
+            new_headers = existing + missing
+            ws.update(f"A1:{col_letter(len(new_headers))}1", [new_headers])
+            existing = new_headers
+    except Exception as e:
+        raise Exception(f"Failed to setup headers: {str(e)}")
 
     return ws
 

@@ -250,6 +250,7 @@ def api_job(job_id):
 @app.route('/api/sync-sheets', methods=['POST'])
 def api_sync_sheets():
     from datetime import datetime
+    import traceback
     try:
         repo_dir, quarantine_dir, show_media_dir = cfg_paths()
         cfg = load_settings()
@@ -257,16 +258,40 @@ def api_sync_sheets():
         sheet = cfg.get('sheet_name')
 
         if not sheet:
-            return jsonify({'error': 'Missing sheet_name in settings.'}), 400
+            return jsonify({'error': 'Missing sheet_name in settings. Please configure in Settings page.'}), 400
         if not sa or not os.path.isfile(sa):
-            return jsonify({'error': f'Service account JSON not found at {sa}'}), 400
+            return jsonify({'error': f'Service account JSON not found. Please upload in Settings page.'}), 400
 
+        # Check if service account JSON file is empty
+        if os.path.getsize(sa) == 0:
+            return jsonify({'error': 'Service account JSON file is empty. Please re-upload the file in Settings page.'}), 400
+
+        print(f"📊 Starting Google Sheets sync to '{sheet}'...")
         records = scan_repo(repo_dir)
+        print(f"📊 Found {len(records)} records to sync")
 
-        # Try open by ID/URL or by name (see open_sheet patch below)
-        ws = open_sheet(sa, sheet)
+        # Try open by ID/URL or by name
+        try:
+            ws = open_sheet(sa, sheet)
+            print(f"✅ Successfully opened sheet '{sheet}'")
+        except Exception as e:
+            error_msg = str(e)
+            if 'credentials' in error_msg.lower() or 'authentication' in error_msg.lower():
+                return jsonify({'error': f'Authentication failed. Check that your Service Account JSON is valid.'}), 400
+            elif 'not found' in error_msg.lower():
+                return jsonify({'error': f"Sheet '{sheet}' not found. Check the sheet name or share the sheet with your service account email."}), 400
+            elif 'permission' in error_msg.lower() or 'access' in error_msg.lower():
+                return jsonify({'error': f"Permission denied. Make sure the sheet is shared with your service account email with edit access."}), 400
+            else:
+                return jsonify({'error': f'Failed to open sheet: {error_msg}'}), 400
 
-        sync_records(ws, records)
+        try:
+            sync_records(ws, records)
+            print(f"✅ Successfully synced {len(records)} records")
+        except Exception as e:
+            print(f"❌ Sync failed: {e}")
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to sync records: {str(e)}'}), 400
 
         # Also log files in show_media_dir to upload_log
         logged_count = 0
@@ -286,10 +311,14 @@ def api_sync_sheets():
             print(f"📊 Upload log sync complete: {logged_count} files logged")
         except Exception as e:
             print(f"⚠️ Warning: Failed to sync upload_log: {e}")
+            # Don't fail the whole sync if upload_log fails
 
+        print(f"✅ Google Sheets sync completed successfully")
         return jsonify({'status': 'ok', 'count': len(records), 'logged': logged_count})
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        print(f"❌ Unexpected error in sync-sheets: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 400
 
 @app.route('/api/move-async', methods=['POST'])
 def api_move_async():

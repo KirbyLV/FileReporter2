@@ -1,7 +1,5 @@
-
 services:
   media:
-    image: jspodick/filereporter2:latest
     build: .
     ports:
       - "8008:8008"
