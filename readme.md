@@ -11,8 +11,14 @@ The easiest way to get started is with the **CustomTkinter configurator**:
 
 **Option 1: Download Pre-built Executable**
 1. Download the latest release from the [Releases page](https://github.com/jspodick/FileReporter2/releases)
-2. **Windows**: Run `FileReporter2 Configurator.exe`
-3. **macOS**: Run `FileReporter2 Configurator.app`
+2. **Windows**:
+   - Download `FileReporter2-Configurator-Windows.exe`
+   - Double-click to run
+3. **macOS**:
+   - Download `FileReporter2-Configurator-macOS.zip`
+   - Unzip to get `FileReporter2 Configurator.app`
+   - Right-click → Open (first time only, to bypass Gatekeeper)
+   - Or drag to Applications folder
 4. The configurator has a modern dark UI with native file/directory pickers
 
 **Option 2: Run from Python**
