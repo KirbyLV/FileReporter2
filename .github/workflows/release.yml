@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pyinstaller customtkinter
+      - run: pip install pyinstaller customtkinter pillow
 
       # macOS: Build .app bundle (not onefile)
       - name: Build macOS App
@@ -70,11 +70,15 @@ jobs:
           # Create a zip of the .app bundle
           zip -r "FileReporter2-Configurator-macOS.zip" "FileReporter2 Configurator.app"
 
-      # Windows: Build standalone .exe
+      # Windows: Convert PNG to ICO and build standalone .exe
       - name: Build Windows EXE
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          pyinstaller --onefile --windowed --name "FileReporter2 Configurator" --icon="static/assets/FR_Logo.png" configurator.py
+          # Convert PNG to ICO using Pillow
+          python -c "from PIL import Image; img = Image.open('static/assets/FR_Logo.png'); img.save('static/assets/App.ico', format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64), (128,128), (256,256)])"
+          # Build with ICO icon
+          pyinstaller --onefile --windowed --name "FileReporter2 Configurator" --icon="static/assets/App.ico" configurator.py
           cd dist
           # Rename for clarity
           move "FileReporter2 Configurator.exe" "FileReporter2-Configurator-Windows.exe"
