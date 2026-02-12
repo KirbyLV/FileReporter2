@@ -293,13 +293,12 @@ def api_sync_sheets():
             traceback.print_exc()
             return jsonify({'error': f'Failed to sync records: {str(e)}'}), 400
 
-        # Also log files in show_media_dir to upload_log
+        # Also log scanned repo files to upload_log
         logged_count = 0
-        print("📊 Syncing upload_log for files in show_media_dir...")
+        print("📊 Syncing upload_log for scanned repo files...")
         try:
-            show_files = scan_repo(show_media_dir)
             timestamp = datetime.utcnow().isoformat() + 'Z'
-            for file_record in show_files:
+            for file_record in records:
                 try:
                     file_path = file_record.get('path', '')
                     if file_path:
